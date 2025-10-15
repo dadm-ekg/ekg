@@ -9,7 +9,7 @@ class IApplicationService {
 public:
     virtual ~IApplicationService() = default;
 
-    bool Load(QString filename);
+    virtual bool Load(QString filename) = 0;
 
     void SetFrequency(double frequency);
 

@@ -8,7 +8,7 @@ class ISignalRepository {
 public:
     virtual ~ISignalRepository() = default;
 
-    std::vector<SignalDatapoint> Load(QString filename);
+    virtual std::vector<SignalDatapoint> Load(QString filename) = 0;
 };
 
 #endif //EKG_SIGNAL_REPOSITORY_H
