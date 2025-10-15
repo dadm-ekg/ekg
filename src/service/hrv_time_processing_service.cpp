@@ -3,6 +3,6 @@
 class HRVTimeProcessingService : public IHRVTimeProcessingService {
 public:
     HRVTimeMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) override {
-        // TODO(Kuba Nowak): trzeba uzupełnić
+        // TODO(Kuba N.): trzeba uzupełnić
     }
 };

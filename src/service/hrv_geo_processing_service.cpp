@@ -3,6 +3,6 @@
 class HRVGeoProcessingService : public IHRVGeoProcessingService {
 public:
     HRVGeoMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) override {
-        // TODO(Kuba Kalina): trzeba uzupełnić
+        // TODO(Kuba K.): trzeba uzupełnić
     }
 };
