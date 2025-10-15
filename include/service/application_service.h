@@ -5,6 +5,7 @@
 #include "../dto/status.h"
 #include "../dto/filter_method.h"
 #include "../model/signal_datapoint.h"
+#include "qstring.h"
 
 class IApplicationService {
 public:
