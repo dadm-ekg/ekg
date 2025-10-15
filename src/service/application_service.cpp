@@ -50,34 +50,34 @@ public:
     }
 
     int GetLength() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     SignalRange GetViewRange() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     void SetViewRange(SignalRange range) override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     std::shared_ptr<std::vector<SignalDatapoint> > GetData() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     std::shared_ptr<std::vector<SignalDatapoint> > GetFilteredData() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     Status GetStatus() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     bool RunFiltering(FilterMethod method) override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     }
 
     int GetFrequency() override {
-        // TODO(Mati): trzeba uzupełnić
+        // TODO(Mati W.): trzeba uzupełnić
     };
 };

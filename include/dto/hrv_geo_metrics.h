@@ -3,6 +3,7 @@
 #include <vector>
 
 class HRVGeoMetrics {
+// TODO(Kuba K.): trzeba zweryfikować
 public:
     float triangular_index;
     float tinn;

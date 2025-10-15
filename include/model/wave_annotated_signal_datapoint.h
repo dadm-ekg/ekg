@@ -3,6 +3,7 @@
 #include "signal_datapoint.h"
 
 class WaveAnnotatedSignalDatapoint : SignalDatapoint {
+// TODO(Magda): trzeba zweryfikować
 public:
     bool p_wave;
     bool q_wave;
