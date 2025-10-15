@@ -6,7 +6,7 @@ class ISignalRepository {
 public:
     virtual ~ISignalRepository() = default;
 
-    virtual std::shared_ptr<SignalDataset> Load(QString filename) = 0;
+    virtual std::shared_ptr<SignalDataset> Load(QString source) = 0;
 };
 
 #endif //EKG_SIGNAL_REPOSITORY_H
