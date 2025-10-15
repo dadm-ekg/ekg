@@ -1,5 +1,20 @@
 #include "../../include/service/application_service.h"
 
-class ApplicationService : IApplicationService {
+#include <iostream>
+#include <ostream>
 
+#include "../../include/repository/signal_repository.h"
+
+class ApplicationService : public IApplicationService {
+    std::shared_ptr<ISignalRepository> signalRepo_;
+
+public:
+    explicit ApplicationService(std::shared_ptr<ISignalRepository> repo)
+        : signalRepo_(std::move(repo)) {
+    }
+
+    bool Load(QString filename) override {
+        std::cout << "Load " << filename.toStdString() << std::endl;
+        return false;
+    };
 };
