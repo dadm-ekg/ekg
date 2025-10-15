@@ -12,28 +12,19 @@ public:
         : signalRepo_(std::move(repo)) {
     }
 
-    bool Load(QString filename) override {
-        signalRepo_->Load(filename);
-    }
+    bool Load(QString filename) override{}
 
-    void SetFrequency(double frequency) override {
-    }
+    int GetLength() override{}
 
-    double GetFrequency() override {
-    }
+    SignalRange GetViewRange() override{}
 
-    int GetLength() override {
-    }
+    void SetViewRange(SignalRange range) override{}
 
-    SignalRange GetPreviewRange() override {
-    }
+    std::shared_ptr<std::vector<SignalDatapoint>> GetData() override{}
 
-    void SetPreviewRange(SignalRange range) override {
-    }
+    std::shared_ptr<std::vector<SignalDatapoint>> GetFilteredData() override{}
 
-    std::vector<SignalDatapoint> GetPreviewData() override {
-    }
+    Status GetStatus() override{}
 
-    Status GetStatus() override {
-    }
+    bool RunFiltering(FilterMethod method) override{}
 };
