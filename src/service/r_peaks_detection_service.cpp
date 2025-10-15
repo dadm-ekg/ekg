@@ -4,6 +4,6 @@ class RPeaksDetectionService : public IRPeaksDetectionService {
 public:
     std::vector<RPeaksAnnotatedSignalDatapoint>
     Detect(std::vector<SignalDatapoint> datapoints, int frequency) override {
-        // TODO(Wiktor): trzeba uzupełnić. Ta metoda musi zwrócić wektor RPeaksAnnotatedSignalDatapoint z uzupełnionymi wartościami RPeaksAnnotatedSignalDatapoint.peak = true, jeżeli w danym punkcie występuje górka
+        // TODO(Mati P.): trzeba uzupełnić. Ta metoda musi zwrócić wektor RPeaksAnnotatedSignalDatapoint z uzupełnionymi wartościami RPeaksAnnotatedSignalDatapoint.peak = true, jeżeli w danym punkcie występuje górka
     };
 };
