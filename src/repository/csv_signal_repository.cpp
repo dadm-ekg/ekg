@@ -2,7 +2,7 @@
 
 class CSVSignalRepository : public ISignalRepository {
 public:
-    std::vector<SignalDatapoint> Load(QString filename) override {
-        return {};
+    std::shared_ptr<std::vector<SignalDatapoint> > Load(QString filename) override {
+        return std::make_shared<std::vector<SignalDatapoint> >();
     }
 };

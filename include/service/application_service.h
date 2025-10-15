@@ -1,8 +1,8 @@
 #ifndef EKG_APPLICATION_SERVICE_H
 #define EKG_APPLICATION_SERVICE_H
-#include <qstring.h>
 
 #include "../dto/signal_range.h"
+#include "../dto/status.h"
 #include "../model/signal_datapoint.h"
 
 class IApplicationService {
@@ -11,17 +11,19 @@ public:
 
     virtual bool Load(QString filename) = 0;
 
-    void SetFrequency(double frequency);
+    virtual void SetFrequency(double frequency) = 0 ;
 
-    double GetFrequency();
+    virtual double GetFrequency()= 0 ;
 
-    int GetLength();
+    virtual int GetLength()= 0 ;
 
-    SignalRange GetPreviewRange();
+    virtual SignalRange GetPreviewRange()= 0 ;
 
-    void SetPreviewRange(SignalRange range);
+    virtual void SetPreviewRange(SignalRange range)= 0 ;
 
-    std::vector<SignalDatapoint> GetPreviewData();
+    virtual std::vector<SignalDatapoint> GetPreviewData()= 0 ;
+
+    virtual Status GetStatus()= 0 ;
 };
 
 #endif //EKG_APPLICATION_SERVICE_H

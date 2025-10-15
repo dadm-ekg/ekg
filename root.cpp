@@ -6,4 +6,4 @@ MainWindow::MainWindow(std::shared_ptr<IApplicationService> application_service,
     application_service_->Load("data.csv");
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() = default;
