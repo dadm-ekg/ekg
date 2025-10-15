@@ -15,6 +15,9 @@
 #include "src/service/butterworth_filter_service.cpp"
 #include "src/service/hrv_time_processing_service.cpp"
 #include "src/service/hrv_geo_processing_service.cpp"
+#include "src/service/hrv_dfa_processing_service.cpp"
+#include "src/service/heart_class_detection_service.cpp"
+#include "src/service/waves_detection_service.cpp"
 
 int main(int argc, char *argv[]) {
     std::shared_ptr<ISignalRepository> signal_repository = std::make_shared<CSVSignalRepository>();
@@ -28,13 +31,22 @@ int main(int argc, char *argv[]) {
         HRVTimeProcessingService>();
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service = std::make_shared<HRVGeoProcessingService>();
 
+    std::shared_ptr<IWavesDetectionService> waves_detection_service = std::make_shared<WavesDetectionService>();
+    std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service = std::make_shared<HRVDFAProcessingService>();
+    std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service = std::make_shared<
+        HeartClassDetectionService>();
+
     std::shared_ptr<IApplicationService> application_service = std::make_shared<ApplicationService>(
         signal_repository,
         butterworth_filter_service,
         moving_average_filter_service,
         r_peaks_detection_service,
         hrv_time_processing_service,
-        hrv_geo_processing_service);
+        hrv_geo_processing_service,
+        hrv_dfa_processing_service,
+        waves_detection_service,
+        heart_class_detection_service
+    );
 
     QApplication a(argc, argv);
     MainWindow w(application_service);
