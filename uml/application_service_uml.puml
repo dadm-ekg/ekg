@@ -1,0 +1,132 @@
+@startuml ApplicationService Class Diagram
+
+skinparam dpi 200
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+interface IApplicationService {
+  + Load(QString filename): bool
+  + GetLength(): int
+  + GetViewRange(): SignalRange
+  + SetViewRange(SignalRange range): void
+  + GetData(): std::shared_ptr<std::vector<SignalDatapoint>>
+  + GetFilteredData(): std::shared_ptr<std::vector<SignalDatapoint>>
+  + GetStatus(): Status
+  + RunFiltering(FilterMethod method): bool
+  + GetFrequency(): int
+}
+
+class ApplicationService {
+  - signal_repository_: std::shared_ptr<ISignalRepository>
+  - butterworth_filter_service_: std::shared_ptr<IFilterService>
+  - moving_average_filter_service_: std::shared_ptr<IFilterService>
+  - r_peaks_detection_service_: std::shared_ptr<IRPeaksDetectionService>
+  - hrv_time_processing_service_: std::shared_ptr<IHRVTimeProcessingService>
+  - hrv_geo_processing_service_: std::shared_ptr<IHRVGeoProcessingService>
+  - hrv_dfa_processing_service_: std::shared_ptr<IHRVDFAProcessingService>
+  - heart_class_detection_service_: std::shared_ptr<IHeartClassDetectionService>
+  - waves_detection_service_: std::shared_ptr<IWavesDetectionService>
+  
+  + ApplicationService(...)
+  + Load(QString filename): bool
+  + GetLength(): int
+  + GetViewRange(): SignalRange
+  + SetViewRange(SignalRange range): void
+  + GetData(): std::shared_ptr<std::vector<SignalDatapoint>>
+  + GetFilteredData(): std::shared_ptr<std::vector<SignalDatapoint>>
+  + GetStatus(): Status
+  + RunFiltering(FilterMethod method): bool
+  + GetFrequency(): int
+}
+
+interface ISignalRepository {
+  + Load(QString filename): void
+}
+
+interface IFilterService {
+  + Filter(): void
+}
+
+interface IRPeaksDetectionService {
+  + DetectRPeaks(): void
+}
+
+interface IHRVTimeProcessingService {
+  + ProcessHRVTime(): void
+}
+
+interface IHRVGeoProcessingService {
+  + ProcessHRVGeo(): void
+}
+
+interface IHRVDFAProcessingService {
+  + ProcessHRVDFA(): void
+}
+
+interface IWavesDetectionService {
+  + DetectWaves(): void
+}
+
+interface IHeartClassDetectionService {
+  + DetectHeartClass(): void
+}
+
+class CSVSignalRepository {
+  + Load(QString filename): void
+}
+
+class ButterworthFilterService {
+  + Filter(): void
+}
+
+class MovingAverageFilterService {
+  + Filter(): void
+}
+
+class RPeaksDetectionService {
+  + DetectRPeaks(): void
+}
+
+class HRVTimeProcessingService {
+  + ProcessHRVTime(): void
+}
+
+class HRVGeoProcessingService {
+  + ProcessHRVGeo(): void
+}
+
+class HRVDFAProcessingService {
+  + ProcessHRVDFA(): void
+}
+
+class WavesDetectionService {
+  + DetectWaves(): void
+}
+
+class HeartClassDetectionService {
+  + DetectHeartClass(): void
+}
+
+ApplicationService ..|> IApplicationService
+
+ApplicationService o--> ISignalRepository
+ApplicationService o--> "2" IFilterService
+ApplicationService o--> IRPeaksDetectionService
+ApplicationService o--> IHRVTimeProcessingService
+ApplicationService o--> IHRVGeoProcessingService
+ApplicationService o--> IHRVDFAProcessingService
+ApplicationService o--> IWavesDetectionService
+ApplicationService o--> IHeartClassDetectionService
+
+CSVSignalRepository ..|> ISignalRepository
+ButterworthFilterService ..|> IFilterService
+MovingAverageFilterService ..|> IFilterService
+RPeaksDetectionService ..|> IRPeaksDetectionService
+HRVTimeProcessingService ..|> IHRVTimeProcessingService
+HRVGeoProcessingService ..|> IHRVGeoProcessingService
+HRVDFAProcessingService ..|> IHRVDFAProcessingService
+WavesDetectionService ..|> IWavesDetectionService
+HeartClassDetectionService ..|> IHeartClassDetectionService
+
+@enduml
+

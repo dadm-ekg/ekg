@@ -1,0 +1,79 @@
+@startuml Application Initialization Sequence
+
+skinparam dpi 200
+
+participant "main()" as main
+participant "CSVSignalRepository" as csv_repo
+participant "ButterworthFilterService" as butterworth
+participant "MovingAverageFilterService" as moving_avg
+participant "RPeaksDetectionService" as r_peaks
+participant "HRVTimeProcessingService" as hrv_time
+participant "HRVGeoProcessingService" as hrv_geo
+participant "HRVDFAProcessingService" as hrv_dfa
+participant "WavesDetectionService" as waves
+participant "HeartClassDetectionService" as heart_class
+participant "ApplicationService" as app_service
+participant "MainWindow" as ui
+participant "QApplication" as qt_app
+
+activate main
+
+create csv_repo
+main -> csv_repo : make_shared<CSVSignalRepository>()
+
+create butterworth
+main -> butterworth : make_shared<ButterworthFilterService>()
+
+create moving_avg
+main -> moving_avg : make_shared<MovingAverageFilterService>()
+
+create r_peaks
+main -> r_peaks : make_shared<RPeaksDetectionService>()
+
+create hrv_time
+main -> hrv_time : make_shared<HRVTimeProcessingService>()
+
+create hrv_geo
+main -> hrv_geo : make_shared<HRVGeoProcessingService>()
+
+create hrv_dfa
+main -> hrv_dfa : make_shared<HRVDFAProcessingService>()
+
+create waves
+main -> waves : make_shared<WavesDetectionService>()
+
+create heart_class
+main -> heart_class : make_shared<HeartClassDetectionService>()
+
+create app_service
+main -> app_service : make_shared<ApplicationService>(\n  signal_repository,\n  butterworth_filter_service,\n  moving_average_filter_service,\n  r_peaks_detection_service,\n  hrv_time_processing_service,\n  hrv_geo_processing_service,\n  hrv_dfa_processing_service,\n  waves_detection_service,\n  heart_class_detection_service)
+
+activate app_service
+app_service -> app_service : Store all dependencies
+deactivate app_service
+
+create qt_app
+main -> qt_app : QApplication(argc, argv)
+
+create ui
+main -> ui : MainWindow(application_service)
+activate ui
+ui -> ui : Initialize UI with ApplicationService
+deactivate ui
+
+main -> ui : show()
+activate ui
+deactivate ui
+
+main -> qt_app : exec()
+activate qt_app
+
+note over qt_app
+  Application Event Loop
+  Running...
+end note
+
+deactivate main
+
+@enduml
+
