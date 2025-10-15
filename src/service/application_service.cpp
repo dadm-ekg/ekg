@@ -17,4 +17,18 @@ public:
         std::cout << "Load " << filename.toStdString() << std::endl;
         return false;
     };
+
+    void SetFrequency(double frequency) override;
+
+    double GetFrequency() override;
+
+    int GetLength() override;
+
+    SignalRange GetPreviewRange() override;
+
+    void SetPreviewRange(SignalRange range) override;
+
+    std::vector<SignalDatapoint> GetPreviewData() override;
+
+    Status GetStatus() override;
 };
