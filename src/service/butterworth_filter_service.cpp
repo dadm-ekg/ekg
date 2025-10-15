@@ -1,8 +1,5 @@
-#include "../../include/service/filter_service.h"
+#include "../../include/service/butterworth_filter_service.h"
 
-class ButterworthFilterService : public IFilterService {
-public:
-    std::vector<SignalDatapoint> Filter(std::vector<SignalDatapoint> values) override {
-        // TODO(Ola): trzeba uzupełnić
-    }
-};
+std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<SignalDatapoint> &values) {
+    // TODO(Ola): trzeba uzupełnić
+}

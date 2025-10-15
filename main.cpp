@@ -2,22 +2,22 @@
 
 #include <QApplication>
 
-#include "include/repository/signal_repository.h"
+#include "include/repository/abstract/signal_repository.h"
+#include "include/repository/csv_signal_repository.h"
+#include "include/service/abstract/application_service.h"
+#include "include/service/abstract/filter_service.h"
+#include "include/service/abstract/r_peaks_detection_service.h"
+#include "include/service/abstract/hrv_geo_processing_service.h"
+#include "include/service/abstract/hrv_time_processing_service.h"
 #include "include/service/application_service.h"
-#include "include/service/filter_service.h"
+#include "include/service/butterworth_filter_service.h"
+#include "include/service/moving_average_filter_service.h"
 #include "include/service/r_peaks_detection_service.h"
-#include "include/service/hrv_geo_processing_service.h"
 #include "include/service/hrv_time_processing_service.h"
-#include "src/repository/csv_signal_repository.cpp"
-#include "src/service/application_service.cpp"
-#include "src/service/r_peaks_detection_service.cpp"
-#include "src/service/moving_average_filter_service.cpp"
-#include "src/service/butterworth_filter_service.cpp"
-#include "src/service/hrv_time_processing_service.cpp"
-#include "src/service/hrv_geo_processing_service.cpp"
-#include "src/service/hrv_dfa_processing_service.cpp"
-#include "src/service/heart_class_detection_service.cpp"
-#include "src/service/waves_detection_service.cpp"
+#include "include/service/hrv_geo_processing_service.h"
+#include "include/service/hrv_dfa_processing_service.h"
+#include "include/service/heart_class_detection_service.h"
+#include "include/service/waves_detection_service.h"
 
 int main(int argc, char *argv[]) {
     std::shared_ptr<ISignalRepository> signal_repository = std::make_shared<CSVSignalRepository>();

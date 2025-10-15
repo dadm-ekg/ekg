@@ -1,15 +1,11 @@
-#ifndef EKG_HRV_TIME_PROCESSING_SERVICE_H
-#define EKG_HRV_TIME_PROCESSING_SERVICE_H
-#include <vector>
+#ifndef EKG_HRV_TIME_PROCESSING_SERVICE_IMPL_H
+#define EKG_HRV_TIME_PROCESSING_SERVICE_IMPL_H
 
-#include "../dto/hrv_time_metrics.h"
-#include "../model/signal_datapoint.h"
+#include "abstract/hrv_time_processing_service.h"
 
-class IHRVTimeProcessingService {
+class HRVTimeProcessingService : public IHRVTimeProcessingService {
 public:
-    virtual ~IHRVTimeProcessingService() = default;
-
-    virtual HRVTimeMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) = 0;
+    HRVTimeMetrics Process(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_HRV_TIME_PROCESSING_SERVICE_H
+#endif //EKG_HRV_TIME_PROCESSING_SERVICE_IMPL_H

@@ -1,15 +1,11 @@
-#ifndef EKG_HEART_CLASS_DETECTION_SERVICE_H
-#define EKG_HEART_CLASS_DETECTION_SERVICE_H
-#include <vector>
+#ifndef EKG_HEART_CLASS_DETECTION_SERVICE_IMPL_H
+#define EKG_HEART_CLASS_DETECTION_SERVICE_IMPL_H
 
-#include "../dto/heart_class_result.h"
-#include "../model/signal_datapoint.h"
+#include "abstract/heart_class_detection_service.h"
 
-class IHeartClassDetectionService {
+class HeartClassDetectionService : public IHeartClassDetectionService {
 public:
-    virtual ~IHeartClassDetectionService() = default;
-
-    virtual HeartClassResult Detect(std::vector<SignalDatapoint> datapoints, int frequency) = 0;
+    HeartClassResult Detect(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_HEART_CLASS_DETECTION_SERVICE_H
+#endif //EKG_HEART_CLASS_DETECTION_SERVICE_IMPL_H
