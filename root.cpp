@@ -5,7 +5,8 @@ MainWindow::MainWindow(std::shared_ptr<IApplicationService> application_service,
     : QMainWindow(parent), application_service_(std::move(application_service)) {
     application_service_->Load("data.csv");
 
-    // TODO(Oliwia Rewer): rewiry Oliwii Rewer
+    // TODO(Oliwia): rewiry Oliwii Rewer xd - trzeba dodać przyciski, itp
+    // TODO(Sonia): obsługa wykresów
 }
 
 MainWindow::~MainWindow() = default;
