@@ -11,19 +11,19 @@ public:
 
     virtual bool Load(QString filename) = 0;
 
-    virtual void SetFrequency(double frequency) = 0 ;
+    virtual void SetFrequency(double frequency) = 0;
 
-    virtual double GetFrequency()= 0 ;
+    virtual double GetFrequency() = 0;
 
-    virtual int GetLength()= 0 ;
+    virtual int GetLength() = 0;
 
-    virtual SignalRange GetPreviewRange()= 0 ;
+    virtual SignalRange GetPreviewRange() = 0;
 
-    virtual void SetPreviewRange(SignalRange range)= 0 ;
+    virtual void SetPreviewRange(SignalRange range) = 0;
 
-    virtual std::vector<SignalDatapoint> GetPreviewData()= 0 ;
+    virtual std::vector<SignalDatapoint> GetPreviewData() = 0;
 
-    virtual Status GetStatus()= 0 ;
+    virtual Status GetStatus() = 0;
 };
 
 #endif //EKG_APPLICATION_SERVICE_H

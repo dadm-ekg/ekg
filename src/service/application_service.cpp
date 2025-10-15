@@ -1,7 +1,6 @@
 #include "../../include/service/application_service.h"
 
-#include <iostream>
-#include <ostream>
+#include <qstring.h>
 
 #include "../../include/repository/signal_repository.h"
 
@@ -14,21 +13,27 @@ public:
     }
 
     bool Load(QString filename) override {
-        std::cout << "Load " << filename.toStdString() << std::endl;
-        return false;
-    };
+        signalRepo_->Load(filename);
+    }
 
-    void SetFrequency(double frequency) override;
+    void SetFrequency(double frequency) override {
+    }
 
-    double GetFrequency() override;
+    double GetFrequency() override {
+    }
 
-    int GetLength() override;
+    int GetLength() override {
+    }
 
-    SignalRange GetPreviewRange() override;
+    SignalRange GetPreviewRange() override {
+    }
 
-    void SetPreviewRange(SignalRange range) override;
+    void SetPreviewRange(SignalRange range) override {
+    }
 
-    std::vector<SignalDatapoint> GetPreviewData() override;
+    std::vector<SignalDatapoint> GetPreviewData() override {
+    }
 
-    Status GetStatus() override;
+    Status GetStatus() override {
+    }
 };
