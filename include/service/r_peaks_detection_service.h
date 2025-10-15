@@ -1,16 +1,11 @@
-#ifndef EKG_R_PEAKS_SERVICE_H
-#define EKG_R_PEAKS_SERVICE_H
-#include <vector>
+#ifndef EKG_R_PEAKS_DETECTION_SERVICE_H
+#define EKG_R_PEAKS_DETECTION_SERVICE_H
 
-#include "../model/r_peaks_annotated_signal_datapoint.h"
-#include "../model/signal_datapoint.h"
+#include "abstract/r_peaks_detection_service.h"
 
-class IRPeaksDetectionService {
+class RPeaksDetectionService : public IRPeaksDetectionService {
 public:
-    virtual ~IRPeaksDetectionService() = default;
-
-    virtual std::vector<RPeaksAnnotatedSignalDatapoint> Detect(std::vector<SignalDatapoint> datapoints, int frequency) =
-    0;
+    std::vector<RPeaksAnnotatedSignalDatapoint> Detect(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_R_PEAKS_SERVICE_H
+#endif //EKG_R_PEAKS_DETECTION_SERVICE_H

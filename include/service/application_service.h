@@ -1,47 +1,57 @@
-#ifndef EKG_APPLICATION_SERVICE_H
-#define EKG_APPLICATION_SERVICE_H
+#ifndef EKG_APPLICATION_SERVICE_IMPL_H
+#define EKG_APPLICATION_SERVICE_IMPL_H
 
-#include "../dto/signal_range.h"
-#include "../dto/status.h"
-#include "../dto/filter_method.h"
-#include "../model/signal_datapoint.h"
-#include "qstring.h"
+#include "abstract/application_service.h"
+#include "../repository/abstract/signal_repository.h"
+#include "abstract/filter_service.h"
+#include "abstract/r_peaks_detection_service.h"
+#include "abstract/hrv_time_processing_service.h"
+#include "abstract/hrv_geo_processing_service.h"
+#include "abstract/hrv_dfa_processing_service.h"
+#include "abstract/waves_detection_service.h"
+#include "abstract/heart_class_detection_service.h"
 
-class IApplicationService {
+class ApplicationService : public IApplicationService {
+    std::shared_ptr<ISignalRepository> signal_repository_;
+    std::shared_ptr<IFilterService> butterworth_filter_service_;
+    std::shared_ptr<IFilterService> moving_average_filter_service_;
+    std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service_;
+    std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service_;
+    std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service_;
+    std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service_;
+    std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service_;
+    std::shared_ptr<IWavesDetectionService> waves_detection_service_;
+
 public:
-    virtual ~IApplicationService() = default;
+    explicit ApplicationService(
+        std::shared_ptr<ISignalRepository> signal_repository,
+        std::shared_ptr<IFilterService> butterworth_filter_service,
+        std::shared_ptr<IFilterService> moving_average_filter_service,
+        std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
+        std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
+        std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
+        std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service,
+        std::shared_ptr<IWavesDetectionService> waves_detection_service,
+        std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service
+    );
 
-    // Ta metoda służy do podstawowego załadowania pliku za pomocą CSV
-    virtual bool Load(QString filename) = 0;
+    bool Load(const QString& filename) override;
 
-    // Ta metoda zwraca długość wektora wartości
-    virtual int GetLength() = 0;
+    int GetLength() const override;
 
-    // Ta metoda zwraca częstotliwość zbioru danych w hertzach
-    virtual int GetFrequency() = 0;
+    SignalRange GetViewRange() const override;
 
-    // W aplikacji istnieje koncept ViewRange - jest to zakres aktualnie wyświetlanego wykresu sygnału
-    // SignalRange.start wskazuje od którego indeksu wektora powinny być wyświetlane dane
-    // SignalRange.end wskazuje końcowy indeks
-    virtual SignalRange GetViewRange() = 0;
+    void SetViewRange(SignalRange range) override;
 
-    // Użytkownik powinien mieć możliwość ustawienia zakresu w trakcie korzystania z programu
-    virtual void SetViewRange(SignalRange range) = 0;
+    std::shared_ptr<std::vector<SignalDatapoint>> GetData() const override;
 
-    // Zwraca sygnał w określonym zakresie przez SignalRange
-    // Ta metoda powinna być użyta do wyrysowania wykresu sygnału
-    // Ten sygnał nie jest przefiltrowany. W przypadku gdy Status=idle, ta metoda zwraca NULLPTR
-    virtual std::shared_ptr<std::vector<SignalDatapoint>> GetData() = 0;
-    // Metoda działająca analogicznie do GetData(), przy czym zwraca sygnał przefiltrowany.
-    // Jeżeli użytkownik nie uruchomił żadnego algorytmu filtracji, metoda zwraca NULLPTR
-    virtual std::shared_ptr<std::vector<SignalDatapoint>> GetFilteredData() = 0;
+    std::shared_ptr<std::vector<SignalDatapoint>> GetFilteredData() const override;
 
-    // Zwraca jeden ze statusów
-    virtual Status GetStatus() = 0;
+    Status GetStatus() const override;
 
-    // Uruchamia filtrowanie wedle zadanego algorytmu. Zwraca prawdę jeżeli filtrowanie się udało.
-    // Po udanym wykonaniu tej metody, GetFilteredData() zwraca sensowne dane.
-    virtual bool RunFiltering(FilterMethod method) = 0;
+    bool RunFiltering(FilterMethod method) override;
+
+    int GetFrequency() const override;
 };
 
-#endif //EKG_APPLICATION_SERVICE_H
+#endif //EKG_APPLICATION_SERVICE_IMPL_H

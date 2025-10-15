@@ -1,8 +1,5 @@
 #include "../../include/service/hrv_geo_processing_service.h"
 
-class HRVGeoProcessingService : public IHRVGeoProcessingService {
-public:
-    HRVGeoMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) override {
-        // TODO(Kuba K.): trzeba uzupełnić
-    }
-};
+HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<SignalDatapoint> &datapoints, int frequency) {
+    // TODO(Kuba K.): trzeba uzupełnić
+}

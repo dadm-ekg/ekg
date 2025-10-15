@@ -1,13 +1,11 @@
-#ifndef EKG_HRV_GEO_PROCESSING_SERVICE_H
-#define EKG_HRV_GEO_PROCESSING_SERVICE_H
-#include "../dto/hrv_geo_metrics.h"
-#include "../model/signal_datapoint.h"
+#ifndef EKG_HRV_GEO_PROCESSING_SERVICE_IMPL_H
+#define EKG_HRV_GEO_PROCESSING_SERVICE_IMPL_H
 
-class IHRVGeoProcessingService {
+#include "abstract/hrv_geo_processing_service.h"
+
+class HRVGeoProcessingService : public IHRVGeoProcessingService {
 public:
-    virtual ~IHRVGeoProcessingService() = default;
-
-    virtual HRVGeoMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) = 0;
+    HRVGeoMetrics Process(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_HRV_GEO_PROCESSING_SERVICE_H
+#endif //EKG_HRV_GEO_PROCESSING_SERVICE_IMPL_H

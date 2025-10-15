@@ -1,8 +1,5 @@
-#include "../../include/service/filter_service.h"
+#include "../../include/service/moving_average_filter_service.h"
 
-class MovingAverageFilterService : public IFilterService {
-public:
-    std::vector<SignalDatapoint> Filter(std::vector<SignalDatapoint> values) override {
-        // TODO(Ola): trzeba uzupełnić
-    }
-};
+std::vector<SignalDatapoint> MovingAverageFilterService::Filter(const std::vector<SignalDatapoint> &values) {
+    // TODO(Ola): trzeba uzupełnić
+}

@@ -1,15 +1,11 @@
-#ifndef EKG_WAVES_DETECTION_SERVICE_H
-#define EKG_WAVES_DETECTION_SERVICE_H
-#include <vector>
+#ifndef EKG_WAVES_DETECTION_SERVICE_IMPL_H
+#define EKG_WAVES_DETECTION_SERVICE_IMPL_H
 
-#include "../model/wave_annotated_signal_datapoint.h"
+#include "abstract/waves_detection_service.h"
 
-class IWavesDetectionService {
+class WavesDetectionService : public IWavesDetectionService {
 public:
-    virtual ~IWavesDetectionService() = default;
-
-    virtual std::vector<WaveAnnotatedSignalDatapoint> Detect(std::vector<SignalDatapoint> datapoints, int frequency) =
-    0;
+    std::vector<WaveAnnotatedSignalDatapoint> Detect(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_WAVES_DETECTION_SERVICE_H
+#endif //EKG_WAVES_DETECTION_SERVICE_IMPL_H

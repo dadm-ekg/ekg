@@ -1,13 +1,9 @@
+#include "../../include/repository/csv_signal_repository.h"
 #include <iostream>
 #include <ostream>
 
-#include "../../include/repository/signal_repository.h"
-#include <qstring.h>
-
-class CSVSignalRepository : public ISignalRepository {
-public:
-    std::shared_ptr<SignalDataset> Load(QString filename) override {
-        std::cout << "CSVSignalRepository::Load " << filename.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
-    }
-};
+std::shared_ptr<SignalDataset> CSVSignalRepository::Load(const QString& filename) {
+    // TODO(Paulina): trzeba uzupełnić
+    std::cout << "CSVSignalRepository::Load " << filename.toStdString() << std::endl;
+    return std::make_shared<SignalDataset>();
+}

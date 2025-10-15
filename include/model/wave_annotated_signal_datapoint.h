@@ -2,8 +2,8 @@
 #define EKG_WAVE_ANNOTATED_SIGNAL_DATAPOINT_H
 #include "signal_datapoint.h"
 
-class WaveAnnotatedSignalDatapoint : SignalDatapoint {
-// TODO(Magda): trzeba zweryfikować
+class WaveAnnotatedSignalDatapoint : public SignalDatapoint {
+    // TODO(Magda): trzeba zweryfikować
 public:
     bool p_wave;
     bool q_wave;

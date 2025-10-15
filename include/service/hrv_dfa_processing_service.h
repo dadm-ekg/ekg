@@ -1,15 +1,11 @@
-#ifndef EKG_HRV_DFA_PROCESSING_SERVICE_H
-#define EKG_HRV_DFA_PROCESSING_SERVICE_H
-#include <vector>
+#ifndef EKG_HRV_DFA_PROCESSING_SERVICE_IMPL_H
+#define EKG_HRV_DFA_PROCESSING_SERVICE_IMPL_H
 
-#include "../dto/hrv_dfa_metrics.h"
-#include "../model/signal_datapoint.h"
+#include "abstract/hrv_dfa_processing_service.h"
 
-class IHRVDFAProcessingService {
+class HRVDFAProcessingService : public IHRVDFAProcessingService {
 public:
-    virtual ~IHRVDFAProcessingService() = default;
-
-    virtual HRVDFAMetrics Process(std::vector<SignalDatapoint> datapoints, int frequency) = 0;
+    HRVDFAMetrics Process(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_HRV_DFA_PROCESSING_SERVICE_H
+#endif //EKG_HRV_DFA_PROCESSING_SERVICE_IMPL_H

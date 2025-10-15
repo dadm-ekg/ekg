@@ -3,7 +3,7 @@
 
 #include <QMainWindow>
 
-#include "include/service/application_service.h"
+#include "include/service/abstract/application_service.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT

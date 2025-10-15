@@ -2,7 +2,7 @@
 #define EKG_R_PEAKS_ANNOTATED_SIGNAL_DATAPOINT_H
 #include "signal_datapoint.h"
 
-class RPeaksAnnotatedSignalDatapoint : SignalDatapoint {
+class RPeaksAnnotatedSignalDatapoint : public SignalDatapoint {
 public:
     bool peak;
 };
