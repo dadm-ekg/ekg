@@ -7,4 +7,5 @@ jobs:
       - id: Qt
         uses: jurplel/install-qt-action@v4
       - uses: actions/checkout@v4
-      - run: cmake --build /Users/mateuszwozniak/QtProjects/ekg/cmake-build-debug --target ekg -j 8
+      - run: cmake .
+      - run: cmake --build .
