@@ -2,4 +2,5 @@
 
 HRVDFAMetrics HRVDFAProcessingService::Process(const std::vector<SignalDatapoint> &datapoints, int frequency) {
     // TODO(Hubert): trzeba uzupełnić
+    return HRVDFAMetrics{};
 }

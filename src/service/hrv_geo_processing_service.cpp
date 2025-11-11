@@ -2,4 +2,5 @@
 
 HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<SignalDatapoint> &datapoints, int frequency) {
     // TODO(Kuba K.): trzeba uzupełnić
+    return HRVGeoMetrics{};
 }
