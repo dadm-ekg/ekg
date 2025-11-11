@@ -3,7 +3,7 @@
 #include <QApplication>
 
 #include "include/repository/abstract/signal_repository.h"
-#include "include/repository/csv_signal_repository.h"
+#include "include/repository/dat_signal_repository.h"
 #include "include/service/abstract/application_service.h"
 #include "include/service/abstract/filter_service.h"
 #include "include/service/abstract/r_peaks_detection_service.h"
@@ -20,7 +20,7 @@
 #include "include/service/waves_detection_service.h"
 
 int main(int argc, char *argv[]) {
-    std::shared_ptr<ISignalRepository> signal_repository = std::make_shared<CSVSignalRepository>();
+    std::shared_ptr<ISignalRepository> signal_repository = std::make_shared<DATSignalRepository>();
 
     std::shared_ptr<IFilterService> butterworth_filter_service = std::make_shared<ButterworthFilterService>();
     std::shared_ptr<IFilterService> moving_average_filter_service = std::make_shared<MovingAverageFilterService>();

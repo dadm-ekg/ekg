@@ -2,4 +2,5 @@
 
 HeartClassResult HeartClassDetectionService::Detect(const std::vector<SignalDatapoint> &datapoints, int frequency) {
     // TODO(Jeremiasz): trzeba uzupełnić
+    return HeartClassResult{};
 }

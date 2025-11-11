@@ -83,3 +83,7 @@ CMakeLists.txt.user*
 
 
 .idea/
+
+CMakeFiles/
+ekg_autogen/
+.qt/
