@@ -22,8 +22,17 @@ ApplicationService::ApplicationService(
       waves_detection_service_(std::move(waves_detection_service)) {
 }
 
-bool ApplicationService::Load(const QString& filename) {
-    signal_repository_->Load(filename);
+bool ApplicationService::Load(const QString &filename) {
+    auto dataset = signal_repository_->Load(filename);
+
+    hrv_time_processing_service_->Process(dataset->values, dataset->frequency);
+    butterworth_filter_service_->Filter(dataset->values);
+    moving_average_filter_service_->Filter(dataset->values);
+    r_peaks_detection_service_->Detect(dataset->values, dataset->frequency);
+    hrv_time_processing_service_->Process(dataset->values, dataset->frequency);
+    hrv_dfa_processing_service_->Process(dataset->values, dataset->frequency);
+    heart_class_detection_service_->Detect(dataset->values, dataset->frequency);
+    waves_detection_service_->Detect(dataset->values, dataset->frequency);
     // TODO(Mati W.): trzeba uzupełnić
 }
 
@@ -39,11 +48,11 @@ void ApplicationService::SetViewRange(SignalRange range) {
     // TODO(Mati W.): trzeba uzupełnić
 }
 
-std::shared_ptr<std::vector<SignalDatapoint>> ApplicationService::GetData() const {
+std::shared_ptr<std::vector<SignalDatapoint> > ApplicationService::GetData() const {
     // TODO(Mati W.): trzeba uzupełnić
 }
 
-std::shared_ptr<std::vector<SignalDatapoint>> ApplicationService::GetFilteredData() const {
+std::shared_ptr<std::vector<SignalDatapoint> > ApplicationService::GetFilteredData() const {
     // TODO(Mati W.): trzeba uzupełnić
 }
 

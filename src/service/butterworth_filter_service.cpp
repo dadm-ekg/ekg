@@ -2,4 +2,5 @@
 
 std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<SignalDatapoint> &values) {
     // TODO(Ola): trzeba uzupełnić
+    return std::vector<SignalDatapoint>{};
 }
