@@ -1,0 +1,95 @@
+@startuml Dependency Injection Component Diagram
+
+skinparam dpi 200
+skinparam componentStyle rectangle
+
+package "Main Application" {
+  component [main.cpp] as main
+}
+
+package "UI Layer" {
+  component [MainWindow] as ui
+}
+
+package "Application Layer" {
+  component [ApplicationService] as app_service
+  interface "IApplicationService" as i_app_service
+  app_service -up- i_app_service
+}
+
+package "Repository Layer" {
+  component [CSVSignalRepository] as csv_repo
+  interface "ISignalRepository" as i_repo
+  csv_repo -up- i_repo
+}
+
+package "Filter Services" {
+  component [ButterworthFilterService] as butterworth
+  component [MovingAverageFilterService] as moving_avg
+  interface "IFilterService" as i_filter
+  butterworth -up- i_filter
+  moving_avg -up- i_filter
+}
+
+package "Detection Services" {
+  component [RPeaksDetectionService] as r_peaks
+  interface "IRPeaksDetectionService" as i_r_peaks
+  r_peaks -up- i_r_peaks
+  
+  component [WavesDetectionService] as waves
+  interface "IWavesDetectionService" as i_waves
+  waves -up- i_waves
+  
+  component [HeartClassDetectionService] as heart_class
+  interface "IHeartClassDetectionService" as i_heart_class
+  heart_class -up- i_heart_class
+}
+
+package "HRV Processing Services" {
+  component [HRVTimeProcessingService] as hrv_time
+  interface "IHRVTimeProcessingService" as i_hrv_time
+  hrv_time -up- i_hrv_time
+  
+  component [HRVGeoProcessingService] as hrv_geo
+  interface "IHRVGeoProcessingService" as i_hrv_geo
+  hrv_geo -up- i_hrv_geo
+  
+  component [HRVDFAProcessingService] as hrv_dfa
+  interface "IHRVDFAProcessingService" as i_hrv_dfa
+  hrv_dfa -up- i_hrv_dfa
+}
+
+main --> csv_repo : creates
+main --> butterworth : creates
+main --> moving_avg : creates
+main --> r_peaks : creates
+main --> hrv_time : creates
+main --> hrv_geo : creates
+main --> hrv_dfa : creates
+main --> waves : creates
+main --> heart_class : creates
+main --> app_service : creates & injects\ndependencies
+
+main --> ui : creates & passes\nApplicationService
+
+ui --> i_app_service : uses
+
+app_service --> i_repo : uses
+app_service --> i_filter : uses (2 instances)
+app_service --> i_r_peaks : uses
+app_service --> i_hrv_time : uses
+app_service --> i_hrv_geo : uses
+app_service --> i_hrv_dfa : uses
+app_service --> i_waves : uses
+app_service --> i_heart_class : uses
+
+note right of main
+  Dependency Injection
+  Container Pattern:
+  - Creates all services
+  - Injects dependencies
+  - Passes to UI layer
+end note
+
+@enduml
+
