@@ -1,0 +1,11 @@
+name: Integration Tests
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - id: Qt
+        uses: jurplel/install-qt-action@v4
+      - uses: actions/checkout@v4
+      - run: cmake .
+      - run: cmake --build .

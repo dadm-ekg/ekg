@@ -9,7 +9,6 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_PREFIX_PATH "/Users/mateuszwozniak/Qt/6.9.3/macos/lib/cmake")
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
@@ -17,6 +16,15 @@ set(PROJECT_SOURCES
         main.cpp
         root.cpp
         root.h
+)
+
+file(GLOB_RECURSE PROJECT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/*.cpp
+        ${PROJECT_SOURCE_DIR}/src/*.h
+        ${PROJECT_SOURCE_DIR}/include/**/*.h
+        ${PROJECT_SOURCE_DIR}/main.cpp
+        ${PROJECT_SOURCE_DIR}/root.cpp
+        ${PROJECT_SOURCE_DIR}/root.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
