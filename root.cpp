@@ -3,7 +3,7 @@
 
 MainWindow::MainWindow(std::shared_ptr<IApplicationService> application_service, QWidget *parent)
     : QMainWindow(parent), application_service_(std::move(application_service)) {
-    application_service_->Load("data.csv");
+    application_service_->Load("data.dat");
 
     // TODO(Oliwia): rewiry Oliwii Rewer xd - trzeba dodać przyciski, itp
     // TODO(Sonia): obsługa wykresów

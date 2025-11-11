@@ -11,7 +11,7 @@ class IApplicationService {
 public:
     virtual ~IApplicationService() = default;
 
-    // Ta metoda służy do podstawowego załadowania pliku za pomocą CSV
+    // Ta metoda służy do podstawowego załadowania pliku za pomocą DAT
     virtual bool Load(const QString& filename) = 0;
 
     // Ta metoda zwraca długość wektora wartości
