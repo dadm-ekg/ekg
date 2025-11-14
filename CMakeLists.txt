@@ -1,3 +1,5 @@
+set(CMAKE_PREFIX_PATH "/Users/oliwiarewer/Qt/6.10.0/macos/lib/cmake")
+
 cmake_minimum_required(VERSION 3.16)
 
 project(ekg VERSION 0.1 LANGUAGES CXX)
