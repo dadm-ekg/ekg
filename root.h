@@ -21,6 +21,9 @@ public:
                         QWidget *parent = nullptr);
     ~MainWindow() override;
 
+private slots:
+    void onLoadDataClicked();
+
 private:
     std::shared_ptr<IApplicationService> application_service_;
     Ui::MainWindow *ui;

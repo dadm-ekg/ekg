@@ -3,27 +3,46 @@
 #include "include/service/abstract/application_service.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileDialog>
+#include <QMessageBox>
 
 MainWindow::MainWindow(std::shared_ptr<IApplicationService> application_service, QWidget *parent)
     : QMainWindow(parent),
     application_service_(std::move(application_service)),
     ui(new Ui::MainWindow)
 {
-    ui->setupUi(this);  // tu ładuje się mainwindow.ui
+    ui->setupUi(this);
 
+    connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::onLoadDataClicked);
+}
+
+MainWindow::~MainWindow() {
+    delete ui;
+}
+
+void MainWindow::onLoadDataClicked() {
     QString appDir = QCoreApplication::applicationDirPath();
     QDir dir(appDir);
 
     while (!dir.exists("ludb") && dir.cdUp()) {
     }
 
-    QString dataPath = dir.absoluteFilePath("ludb/90.dat");
-    application_service_->Load(dataPath);
+    QString ludbPath = dir.absoluteFilePath("ludb");
 
-    // TODO(Oliwia): rewiry Oliwii Rewer xd - trzeba dodać przyciski, itp
-    // TODO(Sonia): obsługa wykresów
-}
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "Wybierz plik danych EKG",
+        ludbPath,
+        "DAT Files (*.dat);;All Files (*)"
+    );
 
-MainWindow::~MainWindow() {
-    delete ui;
+    if (!filename.isEmpty()) {
+        bool success = application_service_->Load(filename);
+        
+        if (success) {
+            statusBar()->showMessage(QString("Załadowano plik: %1").arg(filename), 5000);
+        } else {
+            QMessageBox::warning(this, "Błąd", "Nie udało się załadować pliku.");
+        }
+    }
 }
