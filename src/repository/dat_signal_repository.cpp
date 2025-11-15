@@ -2,15 +2,16 @@
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
+#include <QDir>
 #include <iostream>
 
 std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename) {
     QFileInfo fileInfo(filename);
     QString baseName = fileInfo.completeBaseName();
-    QString dirPath = fileInfo.absolutePath();
+    QDir dir = fileInfo.absoluteDir();
     
-    QString headerPath = dirPath + "/" + baseName + ".hea";
-    QString dataPath = dirPath + "/" + baseName + ".dat";
+    QString headerPath = dir.absoluteFilePath(baseName + ".hea");
+    QString dataPath = dir.absoluteFilePath(baseName + ".dat");
     
     QFile headerFile(headerPath);
     if (!headerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
