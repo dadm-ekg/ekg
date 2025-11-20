@@ -23,16 +23,16 @@ ApplicationService::ApplicationService(
 }
 
 bool ApplicationService::Load(const QString &filename) {
-    auto dataset = signal_repository_->Load(filename);
-
-    hrv_time_processing_service_->Process(dataset->values, dataset->frequency);
-    butterworth_filter_service_->Filter(dataset->values);
-    moving_average_filter_service_->Filter(dataset->values);
-    r_peaks_detection_service_->Detect(dataset->values, dataset->frequency);
-    hrv_time_processing_service_->Process(dataset->values, dataset->frequency);
-    hrv_dfa_processing_service_->Process(dataset->values, dataset->frequency);
-    heart_class_detection_service_->Detect(dataset->values, dataset->frequency);
-    waves_detection_service_->Detect(dataset->values, dataset->frequency);
+    const auto dataset = signal_repository_->Load(filename);
+    const auto filtered_signal_dataset = butterworth_filter_service_->Filter(dataset->values);
+    // Tymczasowo, po prostu uruchamiamy filtr butterwortha i uruchamiamy kolejne moduły. Docelowo będzie od tego przycisk, który podepnie się na końcu.
+    // moving_average_filter_service_->Filter(dataset->values);
+    hrv_time_processing_service_->Process(filtered_signal_dataset, dataset->frequency);
+    r_peaks_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
+    hrv_time_processing_service_->Process(filtered_signal_dataset, dataset->frequency);
+    hrv_dfa_processing_service_->Process(filtered_signal_dataset, dataset->frequency);
+    heart_class_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
+    waves_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     // TODO(Mati W.): trzeba uzupełnić
 }
 
