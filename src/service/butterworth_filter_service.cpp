@@ -1,5 +1,6 @@
 #include "../../include/service/butterworth_filter_service.h"
 #include <cmath>
+#include <iostream>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -41,7 +42,8 @@ std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<
         filtered[i].value = static_cast<float>(y0);
     }
 
+    std::cout << "Butterworth filter finished" << std::endl;
+
     return filtered;
 }
-// return std::vector<SignalDatapoint>{};
 

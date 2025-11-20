@@ -1,4 +1,5 @@
 #include "../../include/service/moving_average_filter_service.h"
+#include <iostream>
 
 std::vector<SignalDatapoint> MovingAverageFilterService::Filter(const std::vector<SignalDatapoint>& values) {
     std::vector<SignalDatapoint> filtered(values.size()); // tworzenie wektora o takiej samej długości jak values
@@ -23,6 +24,7 @@ std::vector<SignalDatapoint> MovingAverageFilterService::Filter(const std::vecto
         filtered[i].value = avg;
     }
 
+    std::cout << "Moving average filter finished" << std::endl;
+
     return filtered;
-    // return std::vector<SignalDatapoint>{};
 }
