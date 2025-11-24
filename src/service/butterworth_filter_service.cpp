@@ -11,6 +11,11 @@ std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<
     if (values.size() < 3) // Jeśli sygnał ma mniej niż 3 próbki nie da się zastosować filtru 2 rzędu
         return values;  // Zwrot wartości
 
+    if (values.empty() || values[0].channelValues.empty())
+        return values;
+
+    const size_t numChannels = values[0].channelValues.size();
+
     // Parametry filtru Butterwortha
     double fs = 500.0; //częstotliwość próbkowania
     double fc = 40.0; //częstotliwość odcięcia
@@ -25,21 +30,27 @@ std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<
     double a1 = 2.0 * (K2 - 1.0) * norm;
     double a2 = (1.0 - std::sqrt(2.0) * K + K2) * norm;
 
-
     // Równanie dla filtru IIR: y[n]=b0?x[n]+b1?x[n?1]+b2?x[n?2]?a1?y[n?1]?a2?y[n?2], gdzie x[n] to aktualny sygnał
-    double x1 = 0, x2 = 0, y1 = 0, y2 = 0; // wartości startwe, x1- wej. z poprzedniego kroku, y1- poprzednia wart. wyj
+    // wartości startwe, x1- wej. z poprzedniego kroku, y1- poprzednia wart. wyj
+    std::vector<double> x1(numChannels, 0.0);
+    std::vector<double> x2(numChannels, 0.0);
+    std::vector<double> y1(numChannels, 0.0);
+    std::vector<double> y2(numChannels, 0.0);
 
     for (size_t i = 0; i < values.size(); ++i) {
-        double x0 = values[i].value;
-        double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+        filtered[i].channelValues.resize(numChannels);
 
-        x2 = x1;
-        x1 = x0;
-        y2 = y1;
-        y1 = y0;
+        for (size_t ch = 0; ch < numChannels; ++ch) {
+            double x0 = values[i].channelValues[ch];
+            double y0 = b0 * x0 + b1 * x1[ch] + b2 * x2[ch] - a1 * y1[ch] - a2 * y2[ch];
 
-        filtered[i] = values[i];
-        filtered[i].value = static_cast<float>(y0);
+            x2[ch] = x1[ch];
+            x1[ch] = x0;
+            y2[ch] = y1[ch];
+            y1[ch] = y0;
+
+            filtered[i].channelValues[ch] = static_cast<float>(y0);
+        }
     }
 
     std::cout << "Butterworth filter finished" << std::endl;
