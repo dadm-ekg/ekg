@@ -1,42 +1,27 @@
+#include "../../include/repository/dat_signal_repository.h"
+
 #include <QtCore/QFile>
-#include <QtCore/QTextStream>
 #include <QtCore/QFileInfo>
 #include <QtCore/QString>
 #include <QRegularExpression>
 
 #include <iostream>
-#include <cstdint>
 #include <algorithm>
 #include <memory>
 #include <vector>
-#include <cmath>    
-#include <limits>   
+#include <cmath>
+#include <limits>
+
+#include "../../include/model/signal_dataset.h"
+#include "../../include/model/signal_datapoint.h"
 
 
-struct SignalDataset
-{
-    int frequency   = 0;  // sampling frequency [Hz]
-    int numSignals  = 0;  // number of channels
-    int numSamples  = 0;  // number of samples per channel
-
-    std::vector<QString> leadNames;                 // lead names
-    std::vector<std::vector<float>> values;        // values[sample][channel]
-};
-
-class DATSignalRepository
-{
-public:
-    std::shared_ptr<SignalDataset> Load(const QString& filename);
-};
-
-
-static bool parse_gain_baseline(const QString& line,
-                                double& gain,
-                                int& baseline,
-                                QString& leadNameOut)
-{
+static bool parse_gain_baseline(const QString &line,
+                                double &gain,
+                                int &baseline,
+                                QString &leadNameOut) {
     const QStringList tokens =
-        line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+            line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
 
     if (tokens.isEmpty()) return false;
 
@@ -45,13 +30,13 @@ static bool parse_gain_baseline(const QString& line,
     baseline = 0;
     leadNameOut = tokens.last();
 
-    for (const QString& t : tokens) {
+    for (const QString &t: tokens) {
         int l = t.indexOf('(');
         int r = t.indexOf(')');
         if (l >= 0 && r > l + 1) {
-            bool okG=false, okB=false;
+            bool okG = false, okB = false;
             double g = t.left(l).toDouble(&okG);
-            int b = t.mid(l+1, r-l-1).toInt(&okB);
+            int b = t.mid(l + 1, r - l - 1).toInt(&okB);
             if (okG && okB) {
                 gain = (g == 0.0 ? 1.0 : g);
                 baseline = b;
@@ -63,29 +48,39 @@ static bool parse_gain_baseline(const QString& line,
     int gainIdx = -1;
     for (int i = 0; i < tokens.size(); ++i) {
         if (tokens[i].contains('/')) {
-            bool okG=false;
+            bool okG = false;
             double g = tokens[i].left(tokens[i].indexOf('/')).toDouble(&okG);
-            if (okG) { gain = (g == 0.0 ? 1.0 : g); gainIdx = i; break; }
+            if (okG) {
+                gain = (g == 0.0 ? 1.0 : g);
+                gainIdx = i;
+                break;
+            }
         }
     }
     if (gainIdx >= 0) {
         for (int j = gainIdx + 1; j < tokens.size(); ++j) {
-            bool okB=false;
+            bool okB = false;
             int b = tokens[j].toInt(&okB);
-            if (okB) { baseline = b; return true; }
+            if (okB) {
+                baseline = b;
+                return true;
+            }
         }
     }
 
-    bool okG=false;
+    bool okG = false;
     double g = 0.0;
-    for (const QString& t : tokens) {
+    for (const QString &t: tokens) {
         if (!okG) {
             g = t.toDouble(&okG);
             if (okG) gain = (g == 0.0 ? 1.0 : g);
         } else {
-            bool okB=false;
+            bool okB = false;
             int b = t.toInt(&okB);
-            if (okB) { baseline = b; return true; }
+            if (okB) {
+                baseline = b;
+                return true;
+            }
         }
     }
 
@@ -93,8 +88,7 @@ static bool parse_gain_baseline(const QString& line,
 }
 
 
-static std::vector<float> resample_linear(const std::vector<float>& src, int targetLen)
-{
+static std::vector<float> resample_linear(const std::vector<float> &src, int targetLen) {
     const int srcLen = static_cast<int>(src.size());
     std::vector<float> out(targetLen, 0.0f);
 
@@ -110,7 +104,7 @@ static std::vector<float> resample_linear(const std::vector<float>& src, int tar
     }
 
     const double scale =
-        static_cast<double>(srcLen - 1) / static_cast<double>(targetLen - 1);
+            static_cast<double>(srcLen - 1) / static_cast<double>(targetLen - 1);
 
     for (int i = 0; i < targetLen; ++i) {
         double pos = i * scale;
@@ -123,16 +117,18 @@ static std::vector<float> resample_linear(const std::vector<float>& src, int tar
     return out;
 }
 
-static void interpolate_invalid_inplace(std::vector<float>& v)
-{
+static void interpolate_invalid_inplace(std::vector<float> &v) {
     const int n = static_cast<int>(v.size());
     if (n == 0) return;
 
-    auto isBad = [](float x){ return !std::isfinite(x); };
+    auto isBad = [](float x) { return !std::isfinite(x); };
 
     int firstValid = -1;
     for (int i = 0; i < n; ++i) {
-        if (!isBad(v[i])) { firstValid = i; break; }
+        if (!isBad(v[i])) {
+            firstValid = i;
+            break;
+        }
     }
     if (firstValid == -1) {
         std::fill(v.begin(), v.end(), 0.0f);
@@ -182,19 +178,18 @@ static void interpolate_invalid_inplace(std::vector<float>& v)
 }
 
 
-std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename)
-{
+std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename) {
     QFileInfo fileInfo(filename);
     const QString baseName = fileInfo.completeBaseName();
-    const QString dirPath  = fileInfo.absolutePath();
+    const QString dirPath = fileInfo.absolutePath();
 
     const QString headerPath = dirPath + "/" + baseName + ".hea";
-    const QString dataPath   = dirPath + "/" + baseName + ".dat";
+    const QString dataPath = dirPath + "/" + baseName + ".dat";
 
     QFile headerFile(headerPath);
     if (!headerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         std::cerr << "Error: Cannot open header file: "
-                  << headerPath.toStdString() << std::endl;
+                << headerPath.toStdString() << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
@@ -202,22 +197,22 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
 
     const QString firstLine = hs.readLine();
     const QStringList parts =
-        firstLine.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+            firstLine.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
 
     if (parts.size() < 4) {
         std::cerr << "Error: Invalid header format (first line): "
-                  << firstLine.toStdString() << std::endl;
+                << firstLine.toStdString() << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
-    bool okN=false, okF=false, okS=false;
+    bool okN = false, okF = false, okS = false;
     const int numSignals = parts[1].toInt(&okN);
-    const int frequency  = parts[2].toInt(&okF);
+    const int frequency = parts[2].toInt(&okF);
     const int numSamples = parts[3].toInt(&okS);
 
     if (!okN || !okF || !okS || numSignals <= 0 || frequency <= 0 || numSamples <= 0) {
         std::cerr << "Error: Invalid numbers in header line: "
-                  << firstLine.toStdString() << std::endl;
+                << firstLine.toStdString() << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
@@ -228,17 +223,19 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
     for (int ch = 0; ch < numSignals; /* ++ch inside */) {
         if (hs.atEnd()) {
             std::cerr << "Error: Unexpected end of header while reading channel lines."
-                      << std::endl;
+                    << std::endl;
             return std::make_shared<SignalDataset>();
         }
 
         const QString line = hs.readLine().trimmed();
         if (line.isEmpty() || line.startsWith('#')) continue;
 
-        double g=1.0; int b=0; QString lead;
+        double g = 1.0;
+        int b = 0;
+        QString lead;
         if (!parse_gain_baseline(line, g, b, lead)) {
             std::cerr << "Error: Cannot parse gain/baseline for channel "
-                      << ch << ": " << line.toStdString() << std::endl;
+                    << ch << ": " << line.toStdString() << std::endl;
             return std::make_shared<SignalDataset>();
         }
 
@@ -253,7 +250,7 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
     QFile dataFile(dataPath);
     if (!dataFile.open(QIODevice::ReadOnly)) {
         std::cerr << "Error: Cannot open data file: "
-                  << dataPath.toStdString() << std::endl;
+                << dataPath.toStdString() << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
@@ -262,41 +259,41 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
 
     if (data.isEmpty()) {
         std::cerr << "Error: Data file is empty: "
-                  << dataPath.toStdString() << std::endl;
+                << dataPath.toStdString() << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
     if (data.size() % static_cast<int>(sizeof(int16_t)) != 0) {
         std::cerr << "Warning: Data size not multiple of 2 bytes. "
-                  << "Size=" << data.size() << " bytes." << std::endl;
+                << "Size=" << data.size() << " bytes." << std::endl;
     }
 
-    const qsizetype totalInt16  =
-        data.size() / static_cast<qsizetype>(sizeof(int16_t));
+    const qsizetype totalInt16 =
+            data.size() / static_cast<qsizetype>(sizeof(int16_t));
     const qsizetype totalFrames = totalInt16 / numSignals;
 
     if (totalFrames <= 0) {
         std::cerr << "Error: Not enough data for a single frame. "
-                  << "totalInt16=" << totalInt16
-                  << ", numSignals=" << numSignals << std::endl;
+                << "totalInt16=" << totalInt16
+                << ", numSignals=" << numSignals << std::endl;
         return std::make_shared<SignalDataset>();
     }
 
     if (totalFrames < numSamples) {
         std::cerr << "Warning: Data shorter than header. "
-                  << "HeaderSamples=" << numSamples
-                  << ", AvailableFrames=" << totalFrames
-                  << ". Will interpolate to header length."
-                  << std::endl;
+                << "HeaderSamples=" << numSamples
+                << ", AvailableFrames=" << totalFrames
+                << ". Will interpolate to header length."
+                << std::endl;
     }
 
     const int framesAvailable =
-        static_cast<int>(std::min<qsizetype>(totalFrames, numSamples));
-    const int16_t* raw =
-        reinterpret_cast<const int16_t*>(data.constData());
+            static_cast<int>(std::min<qsizetype>(totalFrames, numSamples));
+    const int16_t *raw =
+            reinterpret_cast<const int16_t *>(data.constData());
 
-    std::vector<std::vector<float>> temp(framesAvailable,
-                                         std::vector<float>(numSignals, 0.0f));
+    std::vector<std::vector<float> > temp(framesAvailable,
+                                          std::vector<float>(numSignals, 0.0f));
 
     int nonFiniteCount = 0;
     const float NaN = std::numeric_limits<float>::quiet_NaN();
@@ -310,11 +307,11 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
             const int16_t adc = raw[idx];
             float physical = static_cast<float>(
                 (static_cast<double>(adc) - baselines[ch]) / gains[ch]
-                );
+            );
 
             if (!std::isfinite(physical)) {
                 ++nonFiniteCount;
-                physical = NaN;  
+                physical = NaN;
             }
 
             temp[i][ch] = physical;
@@ -334,20 +331,18 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
         }
 
         std::cerr << "Warning: detected " << nonFiniteCount
-                  << " non-finite samples (NaN/Inf); interpolated in time."
-                  << std::endl;
+                << " non-finite samples (NaN/Inf); interpolated in time."
+                << std::endl;
     }
 
     auto dataset = std::make_shared<SignalDataset>();
-    dataset->frequency  = frequency;
-    dataset->numSignals = numSignals;
-    dataset->numSamples = numSamples;         
-    dataset->leadNames  = leadNames;
-    dataset->values.assign(numSamples,
-                           std::vector<float>(numSignals, 0.0f));
+    dataset->frequency = frequency;
+    dataset->values.resize(numSamples);
 
     if (framesAvailable == numSamples) {
-        dataset->values = temp;
+        for (int i = 0; i < numSamples; ++i) {
+            dataset->values[i].channelValues = temp[i];
+        }
     } else {
         for (int ch = 0; ch < numSignals; ++ch) {
             std::vector<float> src(framesAvailable);
@@ -355,17 +350,21 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString& filename
                 src[i] = temp[i][ch];
 
             std::vector<float> interp =
-                resample_linear(src, numSamples);
+                    resample_linear(src, numSamples);
 
-            for (int i = 0; i < numSamples; ++i)
-                dataset->values[i][ch] = interp[i];
+            for (int i = 0; i < numSamples; ++i) {
+                if (dataset->values[i].channelValues.empty()) {
+                    dataset->values[i].channelValues.resize(numSignals, 0.0f);
+                }
+                dataset->values[i].channelValues[ch] = interp[i];
+            }
         }
     }
 
-    std::cout << "Loaded " << dataset->numSamples << " samples x "
-              << dataset->numSignals << " channels at "
-              << dataset->frequency << " Hz from "
-              << filename.toStdString() << std::endl;
+    std::cout << "Loaded " << dataset->values.size() << " samples x "
+            << numSignals << " channels at "
+            << dataset->frequency << " Hz from "
+            << filename.toStdString() << std::endl;
 
     return dataset;
 }
