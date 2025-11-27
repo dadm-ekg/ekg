@@ -178,7 +178,22 @@ ApplicationWindow {
                         "HEART CLASS"
                     ]
                     onCurrentTextChanged: window.currentModule = currentText
+
+                    //poprawka dla comboboxa zeby czcionka pozostawala odpowiednia dla danego motywu
+                    Material.foreground: window.isDarkTheme ? "#f9fafb" : "#111827"
+
+
+                    delegate: ItemDelegate {
+                        width: ListView.view.width
+                        text: modelData
+                        font: moduleCombo.font
+
+
+                        Material.foreground: window.isDarkTheme ? "#f9fafb" : "#111827"
+                    }
                 }
+
+
             }
         }
 
