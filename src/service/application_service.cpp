@@ -1,5 +1,10 @@
 #include "../../include/service/application_service.h"
 
+#include <iostream>
+#include <ostream>
+
+#include "../../include/service/r_peaks_detection_service.h"
+
 ApplicationService::ApplicationService(
     std::shared_ptr<ISignalRepository> signal_repository,
     std::shared_ptr<IFilterService> butterworth_filter_service,
