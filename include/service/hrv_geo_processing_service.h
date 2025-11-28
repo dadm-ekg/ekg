@@ -5,7 +5,7 @@
 
 class HRVGeoProcessingService : public IHRVGeoProcessingService {
 public:
-    HRVGeoMetrics Process(const std::vector<double>& rr_intervals) override;
+    HRVGeoMetrics Process(const std::vector<RPeaksAnnotatedSignalDatapoint>& datapoints, int frequency) override;
 };
 
 #endif //EKG_HRV_GEO_PROCESSING_SERVICE_IMPL_H
