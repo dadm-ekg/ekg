@@ -35,6 +35,7 @@ bool ApplicationService::Load(const QString &filename) {
     const auto detected_r_peaks = r_peaks_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     hrv_time_processing_service_->Process(filtered_signal_dataset, detected_r_peaks, dataset->frequency);
     hrv_dfa_processing_service_->Process(filtered_signal_dataset, dataset->frequency);
+    hrv_geo_processing_service_->Process(detected_r_peaks, dataset->frequency);
     heart_class_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     waves_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     // TODO(Mati W.): trzeba uzupełnić
