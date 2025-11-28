@@ -38,6 +38,7 @@ bool ApplicationService::Load(const QString &filename) {
     heart_class_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     waves_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
     // TODO(Mati W.): trzeba uzupełnić
+    return true;
 }
 
 int ApplicationService::GetLength() const {
