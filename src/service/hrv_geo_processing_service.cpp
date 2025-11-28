@@ -4,8 +4,27 @@
 #include <numeric>
 #include <vector>
 
-HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<double>& rr_intervals) {
+HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<RPeaksAnnotatedSignalDatapoint>& datapoints, int frequency) {
     HRVGeoMetrics metrics;
+
+    std::vector<double> rr_intervals;
+    std::vector<int> r_peak_indices;
+    
+    for (size_t i = 0; i < datapoints.size(); ++i) {
+        if (datapoints[i].peak) {
+            r_peak_indices.push_back(i);
+        }
+    }
+    
+    if (r_peak_indices.size() < 2) {
+        return metrics;
+    }
+    
+    for (size_t i = 1; i < r_peak_indices.size(); ++i) {
+        int sample_diff = r_peak_indices[i] - r_peak_indices[i - 1];
+        double rr_interval_ms = (static_cast<double>(sample_diff) / static_cast<double>(frequency)) * 1000.0;
+        rr_intervals.push_back(rr_interval_ms);
+    }
 
     if (rr_intervals.size() < 2) {
         return metrics;
