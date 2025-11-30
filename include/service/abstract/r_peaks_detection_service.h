@@ -4,12 +4,7 @@
 
 #include "../../model/r_peaks_annotated_signal_datapoint.h"
 #include "../../model/signal_datapoint.h"
-
-enum class RPeaksDetectionMethod {
-    PanTompkins,
-    Hilbert,
-    Wavelet
-};
+#include "../../dto/r_peaks_detection_method.h"
 
 class IRPeaksDetectionService {
 public:
@@ -17,7 +12,8 @@ public:
 
     virtual std::vector<RPeaksAnnotatedSignalDatapoint> Detect(const std::vector<SignalDatapoint> &datapoints,
                                                                int frequency,
-                                                               RPeaksDetectionMethod method = RPeaksDetectionMethod::PanTompkins) =
+                                                               RPeaksDetectionMethod method =
+                                                                       RPeaksDetectionMethod::PanTompkins) =
     0;
 };
 
