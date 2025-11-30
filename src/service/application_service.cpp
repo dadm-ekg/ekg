@@ -30,6 +30,8 @@ ApplicationService::ApplicationService(
 
 bool ApplicationService::Load(const QString &filename) {
     this->loaded_dataset = signal_repository_->Load(filename);
+    this->filtered_dataset = nullptr;
+    this->r_peaks = nullptr;
     const QFileInfo fileInfo(filename);
     this->loaded_filename = fileInfo.completeBaseName();
     return true;
@@ -57,16 +59,29 @@ std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > ApplicationService
 
 bool ApplicationService::RunFiltering(FilterMethod method) const {
     if (this->loaded_dataset == nullptr) return false;
+    
+    this->filtered_dataset = std::make_shared<SignalDataset>();
+    this->filtered_dataset->frequency = this->loaded_dataset->frequency;
+    
     if (method == Butterworth) {
         this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values);
     } else if (method == MovingAverage) {
-        this->moving_average_filter_service_->Filter(this->loaded_dataset->values);
+        this->filtered_dataset->values = this->moving_average_filter_service_->Filter(this->loaded_dataset->values);
     }
+    
     return true;
 }
 
 bool ApplicationService::CalculateRPeaks(RPeaksDetectionMethod method) const {
     if (filtered_dataset == nullptr) return false;
-    this->r_peaks_detection_service_->Detect(this->filtered_dataset->values, this->filtered_dataset->frequency, method);
+    
+    auto detected_peaks = this->r_peaks_detection_service_->Detect(
+        this->filtered_dataset->values, 
+        this->filtered_dataset->frequency, 
+        method
+    );
+    
+    this->r_peaks = std::make_shared<std::vector<RPeaksAnnotatedSignalDatapoint>>(detected_peaks);
+    
     return true;
 }

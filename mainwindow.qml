@@ -33,28 +33,80 @@ ApplicationWindow {
     Material.accent: Material.Teal
 
     property string currentModule: "ECG BASELINE"
+    onCurrentModuleChanged: {
+        analysisStatus.isProcessing = false
+        fakeProgress.stop()
+        analysisProgress.value = 0
+    }
 
     Connections {
         target: ekgController
         function onFileLoadSuccess(filename) {
-            analysisStatus.text = "Status: załadowano plik " + filename.split('/').pop()
-            analysisStatus.color = Material.color(Material.Green)
+            analysisProgress.value = 0
         }
         function onFileLoadError(errorMessage) {
-            analysisStatus.text = "Status: błąd - " + errorMessage
-            analysisStatus.color = Material.color(Material.Red)
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
         function onFilteringSuccess(filterName) {
-            analysisStatus.text = "Status: filtrowanie " + filterName + " zakończone pomyślnie"
-            analysisStatus.color = Material.color(Material.Green)
+            console.log("Filtering success signal received")
+            analysisStatus.isProcessing = false
             fakeProgress.stop()
             analysisProgress.value = 100
         }
         function onFilteringError(errorMessage) {
-            analysisStatus.text = "Status: " + errorMessage
-            analysisStatus.color = Material.color(Material.Red)
+            analysisStatus.isProcessing = false
             fakeProgress.stop()
             analysisProgress.value = 0
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+        function onRPeaksDetectionSuccess(methodName) {
+            console.log("R peaks detection success signal received")
+            analysisStatus.isProcessing = false
+            fakeProgress.stop()
+            analysisProgress.value = 100
+        }
+        function onBaselineCompletedChanged() {
+            if (ekgController.baselineCompleted) {
+                console.log("Baseline completed changed to true")
+                analysisStatus.isProcessing = false
+                fakeProgress.stop()
+                analysisProgress.value = 100
+            }
+        }
+        function onRPeaksCompletedChanged() {
+            if (ekgController.rPeaksCompleted) {
+                console.log("R peaks completed changed to true")
+                analysisStatus.isProcessing = false
+                fakeProgress.stop()
+                analysisProgress.value = 100
+            }
+        }
+        function onRPeaksDetectionError(errorMessage) {
+            analysisStatus.isProcessing = false
+            fakeProgress.stop()
+            analysisProgress.value = 0
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+    }
+
+    function showTemporaryStatus(message, color) {
+        tempStatusText = analysisStatus.text
+        tempStatusColor = analysisStatus.color
+        analysisStatus.text = message
+        analysisStatus.color = Material.color(color)
+        statusResetTimer.restart()
+    }
+
+    property string tempStatusText: ""
+    property color tempStatusColor: textSecondary
+
+    Timer {
+        id: statusResetTimer
+        interval: 3000
+        repeat: false
+        onTriggered: {
+            analysisStatus.text = tempStatusText
+            analysisStatus.color = tempStatusColor
         }
     }
 
@@ -163,14 +215,16 @@ ApplicationWindow {
 
                 Label {
                     id: loadedFileLabel
-                    text: ekgController.isFileLoaded ? "Załadowano: " + ekgController.loadedFilename : "Brak załadowanego pliku"
+                    text: ekgController.hasData ? "✓ Załadowano: " + ekgController.loadedFilename : "Brak załadowanego pliku"
                     font.pixelSize: 12
-                    color: textSecondary
+                    color: ekgController.hasData ? Material.color(Material.Green) : textSecondary
+                    font.bold: ekgController.hasData
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
                 }
 
                 TextField {
+                    id: fileFilterField
                     placeholderText: "Filtruj listę..."
                     Layout.fillWidth: true
                 }
@@ -178,12 +232,35 @@ ApplicationWindow {
                 ListView {
                     id: fileList
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 220
+                    Layout.fillHeight: true
                     clip: true
-                    model: 5
+                    
+                    model: {
+                        var allFiles = ekgController.getAvailableFiles()
+                        if (fileFilterField.text === "") {
+                            return allFiles
+                        }
+                        var filtered = []
+                        for (var i = 0; i < allFiles.length; i++) {
+                            if (allFiles[i].toLowerCase().indexOf(fileFilterField.text.toLowerCase()) !== -1) {
+                                filtered.push(allFiles[i])
+                            }
+                        }
+                        return filtered
+                    }
+                    
                     delegate: ItemDelegate {
                         width: ListView.view.width
-                        text: "record_" + (index + 1) + ".dat"
+                        text: modelData
+                        highlighted: ekgController.loadedFilename === modelData
+                        
+                        onClicked: {
+                            ekgController.loadFileByName(modelData)
+                        }
+                    }
+                    
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AsNeeded
                     }
                 }
 
@@ -298,6 +375,15 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Label {
+                    visible: !ekgController.hasFilteredData && window.currentModule === "R PEAKS"
+                    text: "⚠️ Najpierw uruchom filtrowanie baseline (moduł ECG BASELINE)"
+                    color: Material.color(Material.Orange)
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 Loader {
                     id: paramsLoader
                     Layout.fillWidth: true
@@ -313,10 +399,66 @@ ApplicationWindow {
 
                     Label {
                         id: analysisStatus
-                        text: ekgController.hasData ? "Status: oczekiwanie na analizę" : "Status: oczekiwanie na import pliku"
-                        color: textSecondary
+                        property bool isProcessing: false
+                        property string processingText: ""
+                        property string statusText: {
+                            var module = window.currentModule
+                            var hasData = ekgController.hasData
+                            var hasFiltered = ekgController.hasFilteredData
+                            var baselineOK = ekgController.baselineCompleted
+                            var rPeaksOK = ekgController.rPeaksCompleted
+                            
+                            console.log("Status update - module:", module, "hasData:", hasData, "baselineCompleted:", baselineOK, "rPeaksCompleted:", rPeaksOK)
+                            
+                            if (module === "ECG BASELINE") {
+                                if (!hasData) {
+                                    return "Oczekiwanie na plik"
+                                } else if (!baselineOK) {
+                                    return "Gotowy"
+                                } else {
+                                    return "Skończono"
+                                }
+                            } else if (module === "R PEAKS") {
+                                if (!hasData) {
+                                    return "Oczekiwanie na plik"
+                                } else if (!hasFiltered) {
+                                    return "Oczekiwanie na filtrowanie"
+                                } else if (!rPeaksOK) {
+                                    return "Gotowy"
+                                } else {
+                                    return "Skończono"
+                                }
+                            } else {
+                                return hasData ? "Oczekiwanie na analizę" : "Oczekiwanie na import"
+                            }
+                        }
+                        text: isProcessing ? processingText : statusText
+                        property color statusColor: {
+                            var module = window.currentModule
+                            var hasData = ekgController.hasData
+                            var hasFiltered = ekgController.hasFilteredData
+                            var baselineOK = ekgController.baselineCompleted
+                            var rPeaksOK = ekgController.rPeaksCompleted
+                            
+                            if (module === "ECG BASELINE") {
+                                if (!hasData) return textSecondary
+                                if (!baselineOK) return Material.color(Material.Teal)
+                                return Material.color(Material.Green)
+                            } else if (module === "R PEAKS") {
+                                if (!hasData) return textSecondary
+                                if (!hasFiltered) return textSecondary
+                                if (!rPeaksOK) return Material.color(Material.Teal)
+                                return Material.color(Material.Green)
+                            }
+                            return textSecondary
+                        }
+                        color: statusColor
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                        Component.onCompleted: {
+                            Qt.callLater(function() { })
+                        }
                     }
 
                     ProgressBar {
@@ -338,10 +480,24 @@ ApplicationWindow {
                         id: runButton
                         text: "Uruchom analizę"
                         Layout.fillWidth: true
-                        enabled: ekgController.hasData
+                        enabled: {
+                            if (window.currentModule === "ECG BASELINE") {
+                                return ekgController.hasData
+                            } else if (window.currentModule === "R PEAKS") {
+                                return ekgController.hasFilteredData
+                            }
+                            return true
+                        }
                         
-                        ToolTip.visible: !ekgController.hasData && hovered
-                        ToolTip.text: "Najpierw zaimportuj plik sygnału EKG"
+                        ToolTip.visible: hovered && !enabled
+                        ToolTip.text: {
+                            if (window.currentModule === "ECG BASELINE" && !ekgController.hasData) {
+                                return "Najpierw zaimportuj plik sygnału EKG"
+                            } else if (window.currentModule === "R PEAKS" && !ekgController.hasFilteredData) {
+                                return "Najpierw uruchom filtrowanie baseline"
+                            }
+                            return ""
+                        }
                         ToolTip.delay: 500
                         
                         onClicked: {
@@ -349,8 +505,13 @@ ApplicationWindow {
                                 if (paramsLoader.item && paramsLoader.item.runFiltering) {
                                     paramsLoader.item.runFiltering()
                                 }
+                            } else if (window.currentModule === "R PEAKS") {
+                                if (paramsLoader.item && paramsLoader.item.runDetection) {
+                                    paramsLoader.item.runDetection()
+                                }
                             } else {
-                                analysisStatus.text = "Status: analiza w toku (demo)..."
+                                analysisStatus.text = "Analiza w toku (demo)..."
+                                analysisStatus.color = textSecondary
                                 analysisProgress.value = 0
                                 fakeProgress.restart()
                             }
@@ -361,9 +522,10 @@ ApplicationWindow {
                         text: "Reset"
                         Layout.preferredWidth: 100
                         onClicked: {
+                            analysisStatus.isProcessing = false
                             fakeProgress.stop()
+                            statusResetTimer.stop()
                             analysisProgress.value = 0
-                            analysisStatus.text = "Status: oczekiwanie na analizę"
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
                                 paramsLoader.item.resetState()
@@ -386,7 +548,8 @@ ApplicationWindow {
                 analysisProgress.value += 5
             } else {
                 stop()
-                analysisStatus.text = "Status: analiza zakończona (demo)"
+                analysisStatus.text = "✓ Analiza zakończona (demo)"
+                analysisStatus.color = Material.color(Material.Green)
             }
         }
     }
@@ -413,13 +576,12 @@ ApplicationWindow {
 
             function runFiltering() {
                 if (!filterGroup.checkedButton) {
-                    analysisStatus.text = "Status: wybierz filtr"
-                    analysisStatus.color = Material.color(Material.Orange)
+                    showTemporaryStatus("⚠ Wybierz filtr", Material.Orange)
                     return
                 }
 
-                analysisStatus.text = "Status: filtrowanie w toku..."
-                analysisStatus.color = textSecondary
+                analysisStatus.isProcessing = true
+                analysisStatus.processingText = "Filtrowanie w toku..."
                 analysisProgress.value = 0
                 fakeProgress.restart()
 
@@ -522,10 +684,27 @@ ApplicationWindow {
             implicitHeight: rPeaksColumn.implicitHeight + 20
 
             function resetState() {
-                rPeaksColumn.selectedMethods = 0
-                cbPanTompkins.checked = false
-                cbHilbert.checked = false
-                cbWavelet.checked = false
+                detectionMethodGroup.checkedButton = null
+            }
+
+            function runDetection() {
+                if (!detectionMethodGroup.checkedButton) {
+                    showTemporaryStatus("⚠ Wybierz metodę detekcji", Material.Orange)
+                    return
+                }
+
+                analysisStatus.isProcessing = true
+                analysisStatus.processingText = "Detekcja pików R w toku..."
+                analysisProgress.value = 0
+                fakeProgress.restart()
+
+                if (rbPanTompkins.checked) {
+                    ekgController.runRPeaksDetection(0)
+                } else if (rbHilbert.checked) {
+                    ekgController.runRPeaksDetection(1)
+                } else if (rbWavelet.checked) {
+                    ekgController.runRPeaksDetection(2)
+                }
             }
 
             ColumnLayout {
@@ -533,16 +712,6 @@ ApplicationWindow {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 8
-
-                property int selectedMethods: 0
-
-                function handleToggle(cb) {
-                    if (cb.checked) {
-                        selectedMethods++
-                    } else {
-                        selectedMethods--
-                    }
-                }
 
                 Label {
                     text: "R PEAKS – metoda detekcji"
@@ -552,29 +721,33 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Wybierz metodę / metody detekcji pików R:"
+                    text: "Wybierz metodę detekcji pików R:"
                     color: textSecondary
                     wrapMode: Text.WordWrap
                     font.pixelSize: 12
                     Layout.fillWidth: true
                 }
 
-                CheckBox {
-                    id: cbPanTompkins
+                ButtonGroup {
+                    id: detectionMethodGroup
+                }
+
+                RadioButton {
+                    id: rbPanTompkins
                     text: "Pan-Tompkins"
-                    onToggled: rPeaksColumn.handleToggle(this)
+                    ButtonGroup.group: detectionMethodGroup
                 }
 
-                CheckBox {
-                    id: cbHilbert
+                RadioButton {
+                    id: rbHilbert
                     text: "Transformata Hilberta"
-                    onToggled: rPeaksColumn.handleToggle(this)
+                    ButtonGroup.group: detectionMethodGroup
                 }
 
-                CheckBox {
-                    id: cbWavelet
+                RadioButton {
+                    id: rbWavelet
                     text: "Falkowa (Wavelet)"
-                    onToggled: rPeaksColumn.handleToggle(this)
+                    ButtonGroup.group: detectionMethodGroup
                 }
             }
         }

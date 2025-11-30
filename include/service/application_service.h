@@ -25,8 +25,8 @@ class ApplicationService : public IApplicationService {
 
     QString loaded_filename;
     std::shared_ptr<SignalDataset> loaded_dataset;
-    std::shared_ptr<SignalDataset> filtered_dataset;
-    std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > r_peaks;
+    mutable std::shared_ptr<SignalDataset> filtered_dataset;
+    mutable std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > r_peaks;
 
 public:
     explicit ApplicationService(
