@@ -87,3 +87,5 @@ CMakeLists.txt.user*
 CMakeFiles/
 ekg_autogen/
 .qt/
+
+cmake-build-debug
