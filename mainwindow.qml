@@ -34,6 +34,18 @@ ApplicationWindow {
 
     property string currentModule: "ECG BASELINE"
 
+    Connections {
+        target: ekgController
+        function onFileLoadSuccess(filename) {
+            analysisStatus.text = "Status: załadowano plik " + filename.split('/').pop()
+            analysisStatus.color = Material.color(Material.Green)
+        }
+        function onFileLoadError(errorMessage) {
+            analysisStatus.text = "Status: błąd - " + errorMessage
+            analysisStatus.color = Material.color(Material.Red)
+        }
+    }
+
     header: ToolBar {
         leftPadding: 8
         rightPadding: 8
@@ -54,6 +66,7 @@ ApplicationWindow {
                 text: "Import sygnału"
                 icon.name: "document-open"
                 Material.foreground: window.buttonTextColor
+                onClicked: ekgController.openFileDialog()
             }
 
             Button {
@@ -134,6 +147,15 @@ ApplicationWindow {
                     text: "Pliki / badania"
                     font.bold: true
                     font.pixelSize: 16
+                }
+
+                Label {
+                    id: loadedFileLabel
+                    text: ekgController.isFileLoaded ? "Załadowano: " + ekgController.loadedFilename : "Brak załadowanego pliku"
+                    font.pixelSize: 12
+                    color: textSecondary
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
                 }
 
                 TextField {
