@@ -44,6 +44,18 @@ ApplicationWindow {
             analysisStatus.text = "Status: błąd - " + errorMessage
             analysisStatus.color = Material.color(Material.Red)
         }
+        function onFilteringSuccess(filterName) {
+            analysisStatus.text = "Status: filtrowanie " + filterName + " zakończone pomyślnie"
+            analysisStatus.color = Material.color(Material.Green)
+            fakeProgress.stop()
+            analysisProgress.value = 100
+        }
+        function onFilteringError(errorMessage) {
+            analysisStatus.text = "Status: " + errorMessage
+            analysisStatus.color = Material.color(Material.Red)
+            fakeProgress.stop()
+            analysisProgress.value = 0
+        }
     }
 
     header: ToolBar {
@@ -277,6 +289,15 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                 }
 
+                Label {
+                    visible: !ekgController.hasData && window.currentModule === "ECG BASELINE"
+                    text: "⚠️ Najpierw zaimportuj sygnał EKG"
+                    color: Material.color(Material.Orange)
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 Loader {
                     id: paramsLoader
                     Layout.fillWidth: true
@@ -292,7 +313,7 @@ ApplicationWindow {
 
                     Label {
                         id: analysisStatus
-                        text: "Status: oczekiwanie na analizę"
+                        text: ekgController.hasData ? "Status: oczekiwanie na analizę" : "Status: oczekiwanie na import pliku"
                         color: textSecondary
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
@@ -317,10 +338,22 @@ ApplicationWindow {
                         id: runButton
                         text: "Uruchom analizę"
                         Layout.fillWidth: true
+                        enabled: ekgController.hasData
+                        
+                        ToolTip.visible: !ekgController.hasData && hovered
+                        ToolTip.text: "Najpierw zaimportuj plik sygnału EKG"
+                        ToolTip.delay: 500
+                        
                         onClicked: {
-                            analysisStatus.text = "Status: analiza w toku (demo)..."
-                            analysisProgress.value = 0
-                            fakeProgress.restart()
+                            if (window.currentModule === "ECG BASELINE") {
+                                if (paramsLoader.item && paramsLoader.item.runFiltering) {
+                                    paramsLoader.item.runFiltering()
+                                }
+                            } else {
+                                analysisStatus.text = "Status: analiza w toku (demo)..."
+                                analysisProgress.value = 0
+                                fakeProgress.restart()
+                            }
                         }
                     }
 
@@ -373,12 +406,30 @@ ApplicationWindow {
             implicitHeight: baselineColumn.implicitHeight + 20
 
             function resetState() {
-                baselineColumn.selectedFilters = 0
-                cbMovingAverage.checked = false
-                cbButterworth.checked = false
-                cbSavitzky.checked = false
+                filterGroup.checkedButton = null
                 polyDegreeSpin.value = 3
                 showOnlyFiltered.checked = false
+            }
+
+            function runFiltering() {
+                if (!filterGroup.checkedButton) {
+                    analysisStatus.text = "Status: wybierz filtr"
+                    analysisStatus.color = Material.color(Material.Orange)
+                    return
+                }
+
+                analysisStatus.text = "Status: filtrowanie w toku..."
+                analysisStatus.color = textSecondary
+                analysisProgress.value = 0
+                fakeProgress.restart()
+
+                if (rbMovingAverage.checked) {
+                    ekgController.runBaseline(0)
+                } else if (rbButterworth.checked) {
+                    ekgController.runBaseline(1)
+                } else if (rbSavitzky.checked) {
+                    ekgController.runBaseline(2)
+                }
             }
 
             ColumnLayout {
@@ -386,20 +437,6 @@ ApplicationWindow {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 8
-
-                property int selectedFilters: 0
-
-                function handleToggle(cb) {
-                    if (cb.checked) {
-                        if (selectedFilters >= 2) {
-                            cb.checked = false
-                            return
-                        }
-                        selectedFilters++
-                    } else {
-                        selectedFilters--
-                    }
-                }
 
                 Label {
                     text: "ECG BASELINE – ustawienia filtru"
@@ -416,22 +453,26 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
-                CheckBox {
-                    id: cbMovingAverage
+                ButtonGroup {
+                    id: filterGroup
+                }
+
+                RadioButton {
+                    id: rbMovingAverage
                     text: "Moving Average"
-                    onToggled: baselineColumn.handleToggle(this)
+                    ButtonGroup.group: filterGroup
                 }
 
-                CheckBox {
-                    id: cbButterworth
+                RadioButton {
+                    id: rbButterworth
                     text: "Butterworth"
-                    onToggled: baselineColumn.handleToggle(this)
+                    ButtonGroup.group: filterGroup
                 }
 
-                CheckBox {
-                    id: cbSavitzky
+                RadioButton {
+                    id: rbSavitzky
                     text: "Savitzky-Golay"
-                    onToggled: baselineColumn.handleToggle(this)
+                    ButtonGroup.group: filterGroup
                 }
 
                 Rectangle {
