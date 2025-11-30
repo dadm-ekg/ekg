@@ -10,6 +10,7 @@
 #include "abstract/hrv_dfa_processing_service.h"
 #include "abstract/waves_detection_service.h"
 #include "abstract/heart_class_detection_service.h"
+#include "../dto/filter_method.h"
 
 class ApplicationService : public IApplicationService {
     std::shared_ptr<ISignalRepository> signal_repository_;
@@ -21,6 +22,11 @@ class ApplicationService : public IApplicationService {
     std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service_;
     std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service_;
     std::shared_ptr<IWavesDetectionService> waves_detection_service_;
+
+    QString loaded_filename;
+    std::shared_ptr<SignalDataset> loaded_dataset;
+    std::shared_ptr<SignalDataset> filtered_dataset;
+    std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > r_peaks;
 
 public:
     explicit ApplicationService(
@@ -35,23 +41,21 @@ public:
         std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service
     );
 
-    bool Load(const QString& filename) override;
+    bool Load(const QString &filename) override;
 
-    int GetLength() const override;
+    std::shared_ptr<SignalDataset> GetData() const override;
 
-    SignalRange GetViewRange() const override;
+    std::shared_ptr<SignalDataset> GetFilteredData() const override;
 
-    void SetViewRange(SignalRange range) override;
+    bool IsFileLoaded() const override;
 
-    std::shared_ptr<std::vector<SignalDatapoint>> GetData() const override;
+    QString GetLoadedFilename() const override;
 
-    std::shared_ptr<std::vector<SignalDatapoint>> GetFilteredData() const override;
+    std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > GetRPeaks() const override;
 
-    Status GetStatus() const override;
+    bool RunFiltering(FilterMethod method) const override;
 
-    bool RunFiltering(FilterMethod method) override;
-
-    int GetFrequency() const override;
+    bool CalculateRPeaks(RPeaksDetectionMethod method) const override;
 };
 
 #endif //EKG_APPLICATION_SERVICE_IMPL_H
