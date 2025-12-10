@@ -11,6 +11,8 @@
 #include "abstract/waves_detection_service.h"
 #include "abstract/heart_class_detection_service.h"
 #include "../dto/filter_method.h"
+#include "../dto/hrv_time_metrics.h"
+#include "../dto/hrv_geo_metrics.h"
 
 class ApplicationService : public IApplicationService {
     std::shared_ptr<ISignalRepository> signal_repository_;
@@ -56,6 +58,12 @@ public:
     bool RunFiltering(FilterMethod method) const override;
 
     void ClearFilteredData() const override;
+
+    HRVTimeMetrics CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const override;
+
+    HRVGeoMetrics CalculateHRVGeo() const override;
+
+    void ClearRPeaks() const override;
 
     bool CalculateRPeaks(RPeaksDetectionMethod method) const override;
 };

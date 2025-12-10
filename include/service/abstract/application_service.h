@@ -5,6 +5,8 @@
 
 #include "../../dto/filter_method.h"
 #include "../../dto/r_peaks_detection_method.h"
+#include "../../dto/hrv_time_metrics.h"
+#include "../../dto/hrv_geo_metrics.h"
 #include "../../model/signal_dataset.h"
 #include "../../model/r_peaks_annotated_signal_datapoint.h"
 
@@ -27,6 +29,12 @@ public:
     virtual bool RunFiltering(FilterMethod method) const = 0;
 
     virtual void ClearFilteredData() const = 0;
+
+    virtual HRVTimeMetrics CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const = 0;
+
+    virtual HRVGeoMetrics CalculateHRVGeo() const = 0;
+
+    virtual void ClearRPeaks() const = 0;
 
     virtual bool CalculateRPeaks(RPeaksDetectionMethod method) const = 0;
 };

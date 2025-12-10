@@ -1,5 +1,6 @@
 #include "../../include/bridge/ekg_controller.h"
 #include "../../include/dto/r_peaks_detection_method.h"
+#include "../../include/dto/hrv_time_metrics.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
@@ -7,6 +8,8 @@
 #include <QVariant>
 #include <algorithm>
 #include <cmath>
+#include <numeric>
+#include <vector>
 
 EkgController::EkgController(std::shared_ptr<IApplicationService> application_service, QObject *parent)
     : QObject(parent), application_service_(std::move(application_service)) {
@@ -211,6 +214,12 @@ void EkgController::resetBaseline() {
     emit rPeaksCompletedChanged();
 }
 
+void EkgController::resetRPeaks() {
+    application_service_->ClearRPeaks();
+    r_peaks_completed_ = false;
+    emit rPeaksCompletedChanged();
+}
+
 namespace {
 QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int channel, int maxPoints) {
     QVariantList series;
@@ -278,6 +287,84 @@ QVariantList EkgController::getRPeakMarkers(int channel) const {
     }
 
     return markers;
+}
+
+QVariantMap EkgController::getHrvTimeMetrics(int method) const {
+    QVariantMap out;
+    auto metrics = application_service_->CalculateHRVTime(static_cast<HRVTimeMetrics::SpectralMethod>(method));
+    out.insert("rr_mean", metrics.rr_mean);
+    out.insert("sdnn", metrics.sdnn);
+    out.insert("rmssd", metrics.rmssd);
+    out.insert("tp", metrics.tp);
+    out.insert("vlf", metrics.vlf);
+    out.insert("lf", metrics.lf);
+    out.insert("hf", metrics.hf);
+    out.insert("lf_hf", metrics.lf_hf);
+    return out;
+}
+
+namespace {
+std::vector<double> computeRR(const std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > &peaks, int frequency) {
+    std::vector<double> rr;
+    if (!peaks || peaks->size() < 2 || frequency <= 0) return rr;
+    std::vector<size_t> indices;
+    indices.reserve(peaks->size());
+    for (size_t i = 0; i < peaks->size(); ++i) {
+        if ((*peaks)[i].peak) indices.push_back(i);
+    }
+    if (indices.size() < 2) return rr;
+    rr.reserve(indices.size() - 1);
+    for (size_t i = 1; i < indices.size(); ++i) {
+        double ms = (static_cast<double>(indices[i] - indices[i - 1]) / static_cast<double>(frequency)) * 1000.0;
+        rr.push_back(ms);
+    }
+    return rr;
+}
+} // namespace
+
+QVariantMap EkgController::getHrvGeoMetrics() const {
+    QVariantMap out;
+    auto metrics = application_service_->CalculateHRVGeo();
+    out.insert("triangular_index", metrics.triangular_index);
+    out.insert("tinn", metrics.tinn);
+    out.insert("sd1", metrics.sd1);
+    out.insert("sd2", metrics.sd2);
+    return out;
+}
+
+QVariantList EkgController::getHrvGeoHistogram(int binWidthMs) const {
+    QVariantList hist;
+    if (binWidthMs <= 0) binWidthMs = 5;
+    auto rr = computeRR(application_service_->GetRPeaks(), samplingFrequency());
+    if (rr.empty()) return hist;
+    double min_rr = *std::min_element(rr.begin(), rr.end());
+    double max_rr = *std::max_element(rr.begin(), rr.end());
+    int numBins = static_cast<int>(std::ceil((max_rr - min_rr) / binWidthMs)) + 1;
+    std::vector<int> bins(numBins, 0);
+    for (double v : rr) {
+        int bin = static_cast<int>((v - min_rr) / binWidthMs);
+        if (bin >= 0 && bin < numBins) bins[bin]++;
+    }
+    for (int i = 0; i < numBins; ++i) {
+        QVariantMap p;
+        p["x"] = min_rr + i * binWidthMs;
+        p["y"] = bins[i];
+        hist.append(p);
+    }
+    return hist;
+}
+
+QVariantList EkgController::getHrvPoincarePoints() const {
+    QVariantList pts;
+    auto rr = computeRR(application_service_->GetRPeaks(), samplingFrequency());
+    if (rr.size() < 2) return pts;
+    for (size_t i = 1; i < rr.size(); ++i) {
+        QVariantMap p;
+        p["x"] = rr[i - 1];
+        p["y"] = rr[i];
+        pts.append(p);
+    }
+    return pts;
 }
 
 int EkgController::channelCount() const {

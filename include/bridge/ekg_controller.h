@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QVariantList>
+#include <QVariantMap>
 #include <memory>
 #include "../service/abstract/application_service.h"
 
@@ -40,9 +41,14 @@ public:
     Q_INVOKABLE QStringList getAvailableFiles() const;
     Q_INVOKABLE void loadFileByName(const QString &filename);
     Q_INVOKABLE void resetBaseline();
+    Q_INVOKABLE void resetRPeaks();
     Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
+    Q_INVOKABLE QVariantMap getHrvTimeMetrics(int method = 0) const;
+    Q_INVOKABLE QVariantMap getHrvGeoMetrics() const;
+    Q_INVOKABLE QVariantList getHrvGeoHistogram(int binWidthMs = 5) const;
+    Q_INVOKABLE QVariantList getHrvPoincarePoints() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
 

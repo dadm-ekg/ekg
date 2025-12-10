@@ -41,6 +41,10 @@ ApplicationWindow {
     property int selectedChannelIndex: 0
     property int maxPlottedPoints: 4000
     property var channelOptions: []
+    property var hrvTimeMetrics: ({})
+    property var hrvGeoMetrics: ({})
+    property var hrvGeoHistogram: []
+    property var hrvPoincarePoints: []
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -64,6 +68,11 @@ ApplicationWindow {
             chartFilteredSeries = []
             chartRPeaksSeries = []
             Qt.callLater(applySeriesToChart)
+            hrvTimeMetrics = ({})
+            hrvGeoMetrics = ({})
+            hrvGeoHistogram = []
+            hrvPoincarePoints = []
+            Qt.callLater(applyHrvCharts)
             return
         }
 
@@ -72,6 +81,7 @@ ApplicationWindow {
         chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
         chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
         Qt.callLater(applySeriesToChart)
+        Qt.callLater(refreshHrvCharts)
     }
 
     function applySeriesToChart() {
@@ -149,6 +159,78 @@ ApplicationWindow {
         chartAxisY.max = maxY
     }
 
+    function refreshHrvTime() {
+        if (!ekgController.hasFilteredData || !ekgController.rPeaksCompleted) {
+            hrvTimeMetrics = ({})
+            return
+        }
+        hrvTimeMetrics = ekgController.getHrvTimeMetrics(0)
+        Qt.callLater(applyHrvTimeChart)
+    }
+
+    function refreshHrvGeo() {
+        if (!ekgController.hasFilteredData || !ekgController.rPeaksCompleted) {
+            hrvGeoMetrics = ({})
+            hrvGeoHistogram = []
+            hrvPoincarePoints = []
+            Qt.callLater(applyHrvGeoCharts)
+            return
+        }
+        hrvGeoMetrics = ekgController.getHrvGeoMetrics()
+        hrvGeoHistogram = ekgController.getHrvGeoHistogram()
+        hrvPoincarePoints = ekgController.getHrvPoincarePoints()
+        Qt.callLater(applyHrvGeoCharts)
+    }
+
+    function refreshHrvCharts() {
+        if (window.currentModule === "HRV1")
+            refreshHrvTime()
+        else if (window.currentModule === "HRV2")
+            refreshHrvGeo()
+    }
+
+    function applyHrvTimeChart() {
+        if (typeof hrvPowerBarSet === "undefined")
+            return
+
+        var vlf = Number(hrvTimeMetrics.vlf || 0)
+        var lf = Number(hrvTimeMetrics.lf || 0)
+        var hf = Number(hrvTimeMetrics.hf || 0)
+        hrvPowerBarSet.replace(0, vlf)
+        hrvPowerBarSet.replace(1, lf)
+        hrvPowerBarSet.replace(2, hf)
+    }
+
+    function applyHrvGeoCharts() {
+        if (typeof hrvHistogramSeries === "undefined" || typeof hrvPoincareSeries === "undefined")
+            return
+
+        hrvHistogramSeries.clear()
+        for (var i = 0; i < hrvGeoHistogram.length; ++i) {
+            var p = hrvGeoHistogram[i]
+            if (!p) continue
+            var bx = Number(p.x !== undefined ? p.x : p["x"])
+            var by = Number(p.y !== undefined ? p.y : p["y"])
+            if (isNaN(bx) || isNaN(by)) continue
+            hrvHistogramSeries.append(bx, by)
+        }
+
+        hrvPoincareSeries.clear()
+        for (var j = 0; j < hrvPoincarePoints.length; ++j) {
+            var pp = hrvPoincarePoints[j]
+            if (!pp) continue
+            var px = Number(pp.x !== undefined ? pp.x : pp["x"])
+            var py = Number(pp.y !== undefined ? pp.y : pp["y"])
+            if (isNaN(px) || isNaN(py)) continue
+            hrvPoincareSeries.append(px, py)
+        }
+    }
+
+    function applyHrvCharts() {
+        applyHrvTimeChart()
+        applyHrvGeoCharts()
+    }
+
     function chartDurationSec() {
         if (chartFilteredSeries.length < 2)
             return 0
@@ -172,6 +254,7 @@ ApplicationWindow {
         fakeProgress.stop()
         analysisProgress.value = 0
         refreshVisualization()
+        refreshHrvCharts()
     }
 
     Connections {
@@ -203,6 +286,7 @@ ApplicationWindow {
             fakeProgress.stop()
             analysisProgress.value = 100
             refreshVisualization()
+            refreshHrvCharts()
         }
         function onBaselineCompletedChanged() {
             if (ekgController.baselineCompleted) {
@@ -211,6 +295,7 @@ ApplicationWindow {
                 fakeProgress.stop()
                 analysisProgress.value = 100
                 refreshVisualization()
+                refreshHrvCharts()
             }
         }
         function onRPeaksCompletedChanged() {
@@ -220,6 +305,7 @@ ApplicationWindow {
                 fakeProgress.stop()
                 analysisProgress.value = 100
                 refreshVisualization()
+                refreshHrvCharts()
             }
         }
         function onRPeaksDetectionError(errorMessage) {
@@ -599,6 +685,105 @@ ApplicationWindow {
                                 color: textSecondary
                             }
                         }
+
+                        // HRV TIME (HRV1)
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: window.currentModule === "HRV1"
+                            spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                Label { text: "RR mean: " + (hrvTimeMetrics.rr_mean !== undefined ? hrvTimeMetrics.rr_mean.toFixed(1) + " ms" : "-"); color: textSecondary }
+                                Label { text: "SDNN: " + (hrvTimeMetrics.sdnn !== undefined ? hrvTimeMetrics.sdnn.toFixed(1) + " ms" : "-"); color: textSecondary }
+                                Label { text: "RMSSD: " + (hrvTimeMetrics.rmssd !== undefined ? hrvTimeMetrics.rmssd.toFixed(1) + " ms" : "-"); color: textSecondary }
+                                Label { text: "LF/HF: " + (hrvTimeMetrics.lf_hf !== undefined ? hrvTimeMetrics.lf_hf.toFixed(2) : "-"); color: textSecondary }
+                            }
+
+                            ChartView {
+                                id: hrvTimeChart
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 220
+                                antialiasing: true
+                                backgroundColor: vizBg
+                                legend.visible: false
+
+                                ValueAxis { id: hrvTimeAxisY; labelsColor: textSecondary; min: 0 }
+                                BarCategoryAxis {
+                                    id: hrvTimeAxisX
+                                    labelsColor: textSecondary
+                                    categories: ["VLF", "LF", "HF"]
+                                }
+
+                                BarSeries {
+                                    id: hrvPowerSeries
+                                    axisX: hrvTimeAxisX
+                                    axisY: hrvTimeAxisY
+                                    BarSet {
+                                        id: hrvPowerBarSet
+                                        label: "Moc"
+                                        values: [0, 0, 0]
+                                    }
+                                }
+                            }
+                        }
+
+                        // HRV GEO (HRV2)
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: window.currentModule === "HRV2"
+                            spacing: 8
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 12
+                                Label { text: "SD1: " + (hrvGeoMetrics.sd1 !== undefined ? hrvGeoMetrics.sd1.toFixed(1) : "-"); color: textSecondary }
+                                Label { text: "SD2: " + (hrvGeoMetrics.sd2 !== undefined ? hrvGeoMetrics.sd2.toFixed(1) : "-"); color: textSecondary }
+                                Label { text: "Triangular index: " + (hrvGeoMetrics.triangular_index !== undefined ? hrvGeoMetrics.triangular_index.toFixed(2) : "-"); color: textSecondary }
+                                Label { text: "TiNN: " + (hrvGeoMetrics.tinn !== undefined ? hrvGeoMetrics.tinn.toFixed(2) : "-"); color: textSecondary }
+                            }
+
+                            ChartView {
+                                id: hrvHistogramChart
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 200
+                                antialiasing: true
+                                backgroundColor: vizBg
+                                legend.visible: false
+
+                                ValueAxis { id: hrvHistAxisX; titleText: "RR bin"; labelsColor: textSecondary }
+                                ValueAxis { id: hrvHistAxisY; titleText: "Count"; labelsColor: textSecondary; min: 0 }
+
+                                LineSeries {
+                                    id: hrvHistogramSeries
+                                    axisX: hrvHistAxisX
+                                    axisY: hrvHistAxisY
+                                    color: "#8b5cf6"
+                                }
+                            }
+
+                            ChartView {
+                                id: hrvPoincareChart
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 220
+                                antialiasing: true
+                                backgroundColor: vizBg
+                                legend.visible: false
+
+                                ValueAxis { id: poincareAxisX; titleText: "RR(n) [ms]"; labelsColor: textSecondary }
+                                ValueAxis { id: poincareAxisY; titleText: "RR(n+1) [ms]"; labelsColor: textSecondary }
+
+                                ScatterSeries {
+                                    id: hrvPoincareSeries
+                                    axisX: poincareAxisX
+                                    axisY: poincareAxisY
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    color: "#f97316"
+                                }
+                            }
+                        }
                     }
 
                     FileDialog {
@@ -760,20 +945,30 @@ ApplicationWindow {
                         text: "Uruchom analizę"
                         Layout.fillWidth: true
                         enabled: {
+                            var params = paramsLoader.item
                             if (window.currentModule === "ECG BASELINE") {
-                                return ekgController.hasData
+                                return params && params.isReady && params.isReady()
                             } else if (window.currentModule === "R PEAKS") {
-                                return ekgController.hasFilteredData
+                                return params && params.isReady && params.isReady()
+                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
+                                return ekgController.rPeaksCompleted
                             }
                             return true
                         }
                         
                         ToolTip.visible: hovered && !enabled
                         ToolTip.text: {
+                            var params = paramsLoader.item
                             if (window.currentModule === "ECG BASELINE" && !ekgController.hasData) {
                                 return "Najpierw zaimportuj plik sygnału EKG"
+                            } else if (window.currentModule === "ECG BASELINE" && (!params || !params.isReady || !params.isReady())) {
+                                return "Wybierz filtr baseline"
                             } else if (window.currentModule === "R PEAKS" && !ekgController.hasFilteredData) {
                                 return "Najpierw uruchom filtrowanie baseline"
+                            } else if (window.currentModule === "R PEAKS" && (!params || !params.isReady || !params.isReady())) {
+                                return "Wybierz metodę detekcji R"
+                            } else if ((window.currentModule === "HRV1" || window.currentModule === "HRV2") && !ekgController.rPeaksCompleted) {
+                                return "Najpierw wykonaj detekcję pików R"
                             }
                             return ""
                         }
@@ -788,6 +983,19 @@ ApplicationWindow {
                                 if (paramsLoader.item && paramsLoader.item.runDetection) {
                                     paramsLoader.item.runDetection()
                                 }
+                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
+                                if (!ekgController.rPeaksCompleted) {
+                                    showTemporaryStatus("⚠ Wykonaj najpierw detekcję R", Material.Orange)
+                                    return
+                                }
+                                analysisStatus.isProcessing = true
+                                analysisStatus.processingText = "Obliczam HRV..."
+                                analysisProgress.value = 0
+                                refreshHrvCharts()
+                                analysisStatus.isProcessing = false
+                                analysisStatus.text = "HRV gotowe"
+                                analysisStatus.color = Material.color(Material.Green)
+                                analysisProgress.value = 100
                             } else {
                                 analysisStatus.text = "Analiza w toku (demo)..."
                                 analysisStatus.color = textSecondary
@@ -805,11 +1013,43 @@ ApplicationWindow {
                             fakeProgress.stop()
                             statusResetTimer.stop()
                             analysisProgress.value = 0
-                            ekgController.resetBaseline()
-                            chartRawSeries = ekgController.getRawSeries(selectedChannelIndex, maxPlottedPoints)
-                            chartFilteredSeries = []
-                            chartRPeaksSeries = []
-                            applySeriesToChart()
+                            if (window.currentModule === "ECG BASELINE") {
+                                ekgController.resetBaseline()
+                                chartRawSeries = ekgController.getRawSeries(selectedChannelIndex, maxPlottedPoints)
+                                chartFilteredSeries = []
+                                chartRPeaksSeries = []
+                                hrvTimeMetrics = ({})
+                                hrvGeoMetrics = ({})
+                                hrvGeoHistogram = []
+                                hrvPoincarePoints = []
+                                applySeriesToChart()
+                                applyHrvCharts()
+                            } else if (window.currentModule === "R PEAKS") {
+                                ekgController.resetRPeaks()
+                                chartRPeaksSeries = []
+                                hrvTimeMetrics = ({})
+                                hrvGeoMetrics = ({})
+                                hrvGeoHistogram = []
+                                hrvPoincarePoints = []
+                                applySeriesToChart()
+                                applyHrvCharts()
+                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
+                                hrvTimeMetrics = ({})
+                                hrvGeoMetrics = ({})
+                                hrvGeoHistogram = []
+                                hrvPoincarePoints = []
+                                applyHrvCharts()
+                            } else {
+                                chartRawSeries = []
+                                chartFilteredSeries = []
+                                chartRPeaksSeries = []
+                                hrvTimeMetrics = ({})
+                                hrvGeoMetrics = ({})
+                                hrvGeoHistogram = []
+                                hrvPoincarePoints = []
+                                applySeriesToChart()
+                                applyHrvCharts()
+                            }
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
                                 paramsLoader.item.resetState()
@@ -851,6 +1091,9 @@ ApplicationWindow {
             border.width: 1
             clip: true
             implicitHeight: baselineColumn.implicitHeight + 20
+            function isReady() {
+                return ekgController.hasData && filterGroup.checkedButton !== null
+            }
 
             function resetState() {
                 filterGroup.checkedButton = null
@@ -966,6 +1209,9 @@ ApplicationWindow {
             border.width: 1
             clip: true
             implicitHeight: rPeaksColumn.implicitHeight + 20
+            function isReady() {
+                return ekgController.hasFilteredData && detectionMethodGroup.checkedButton !== null
+            }
 
             function resetState() {
                 detectionMethodGroup.checkedButton = null

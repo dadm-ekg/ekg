@@ -78,6 +78,10 @@ void ApplicationService::ClearFilteredData() const {
     this->r_peaks = nullptr;
 }
 
+void ApplicationService::ClearRPeaks() const {
+    this->r_peaks = nullptr;
+}
+
 bool ApplicationService::CalculateRPeaks(RPeaksDetectionMethod method) const {
     if (filtered_dataset == nullptr) return false;
     
@@ -90,4 +94,18 @@ bool ApplicationService::CalculateRPeaks(RPeaksDetectionMethod method) const {
     this->r_peaks = std::make_shared<std::vector<RPeaksAnnotatedSignalDatapoint>>(detected_peaks);
     
     return true;
+}
+
+HRVTimeMetrics ApplicationService::CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const {
+    if (filtered_dataset == nullptr || r_peaks == nullptr) {
+        return HRVTimeMetrics{};
+    }
+    return hrv_time_processing_service_->Process(filtered_dataset->values, *r_peaks, filtered_dataset->frequency, method);
+}
+
+HRVGeoMetrics ApplicationService::CalculateHRVGeo() const {
+    if (r_peaks == nullptr || filtered_dataset == nullptr) {
+        return HRVGeoMetrics{};
+    }
+    return hrv_geo_processing_service_->Process(*r_peaks, filtered_dataset->frequency);
 }
