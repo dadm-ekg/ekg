@@ -55,6 +55,8 @@ public:
 
     bool RunFiltering(FilterMethod method) const override;
 
+    void ClearFilteredData() const override;
+
     bool CalculateRPeaks(RPeaksDetectionMethod method) const override;
 };
 

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 #include <memory>
 #include "../service/abstract/application_service.h"
 
@@ -38,6 +39,12 @@ public:
     Q_INVOKABLE bool runRPeaksDetection(int method);
     Q_INVOKABLE QStringList getAvailableFiles() const;
     Q_INVOKABLE void loadFileByName(const QString &filename);
+    Q_INVOKABLE void resetBaseline();
+    Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
+    Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
+    Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
+    Q_INVOKABLE int channelCount() const;
+    Q_INVOKABLE double samplingFrequency() const;
 
     QString loadedFilename() const;
     bool isFileLoaded() const;

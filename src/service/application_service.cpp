@@ -46,7 +46,7 @@ std::shared_ptr<SignalDataset> ApplicationService::GetFilteredData() const {
 }
 
 bool ApplicationService::IsFileLoaded() const {
-    return loaded_filename.isEmpty();
+    return !loaded_filename.isEmpty();
 }
 
 QString ApplicationService::GetLoadedFilename() const {
@@ -62,6 +62,7 @@ bool ApplicationService::RunFiltering(FilterMethod method) const {
     
     this->filtered_dataset = std::make_shared<SignalDataset>();
     this->filtered_dataset->frequency = this->loaded_dataset->frequency;
+    this->r_peaks = nullptr;
     
     if (method == Butterworth) {
         this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values);
@@ -70,6 +71,11 @@ bool ApplicationService::RunFiltering(FilterMethod method) const {
     }
     
     return true;
+}
+
+void ApplicationService::ClearFilteredData() const {
+    this->filtered_dataset = nullptr;
+    this->r_peaks = nullptr;
 }
 
 bool ApplicationService::CalculateRPeaks(RPeaksDetectionMethod method) const {

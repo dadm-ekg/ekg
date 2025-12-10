@@ -26,6 +26,8 @@ public:
 
     virtual bool RunFiltering(FilterMethod method) const = 0;
 
+    virtual void ClearFilteredData() const = 0;
+
     virtual bool CalculateRPeaks(RPeaksDetectionMethod method) const = 0;
 };
 

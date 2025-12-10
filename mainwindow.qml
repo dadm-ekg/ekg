@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Controls.Material
+import QtQuick.Dialogs
+import QtCharts
 
 ApplicationWindow {
     id: window
@@ -31,18 +33,136 @@ ApplicationWindow {
     color: bgMain
     Material.theme: isDarkTheme ? Material.Dark : Material.Light
     Material.accent: Material.Teal
+    Component.onCompleted: rebuildChannelOptions()
+
+    property var chartRawSeries: []
+    property var chartFilteredSeries: []
+    property var chartRPeaksSeries: []
+    property int selectedChannelIndex: 0
+    property int maxPlottedPoints: 4000
+    property var channelOptions: []
+
+    function clampChannelIndex(idx) {
+        if (channelOptions.length === 0)
+            return 0
+        return Math.min(Math.max(idx, 0), channelOptions.length - 1)
+    }
+
+    function rebuildChannelOptions() {
+        var count = ekgController.channelCount()
+        var items = []
+        for (var i = 0; i < count; ++i) {
+            items.push("Kanał " + (i + 1))
+        }
+        channelOptions = items
+        selectedChannelIndex = clampChannelIndex(selectedChannelIndex)
+    }
+
+    function refreshVisualization() {
+        if (!ekgController.hasData) {
+            chartRawSeries = []
+            chartFilteredSeries = []
+            chartRPeaksSeries = []
+            Qt.callLater(applySeriesToChart)
+            return
+        }
+
+        var channel = clampChannelIndex(selectedChannelIndex)
+        chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
+        chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
+        chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
+        Qt.callLater(applySeriesToChart)
+    }
+
+    function applySeriesToChart() {
+        if (typeof rawSeriesLine === "undefined" || typeof filteredSeriesLine === "undefined" || typeof peaksSeries === "undefined")
+            return
+
+        function updateSeries(series, data) {
+            series.clear()
+            var loggedSample = false
+            for (var i = 0; i < data.length; ++i) {
+                var p = data[i]
+                var xVal = undefined
+                var yVal = undefined
+                if (p !== undefined && p !== null) {
+                    if (p.x !== undefined) {
+                        xVal = Number(p.x)
+                        yVal = Number(p.y)
+                    } else if (p["x"] !== undefined) {
+                        xVal = Number(p["x"])
+                        yVal = Number(p["y"])
+                    }
+                }
+                if (xVal === undefined || yVal === undefined || isNaN(xVal) || isNaN(yVal))
+                    continue
+                series.append(xVal, yVal)
+                if (!loggedSample && i === 0) {
+                    console.log("QML append first point", xVal, yVal)
+                    loggedSample = true
+                }
+            }
+            series.visible = data.length > 0
+        }
+
+        console.log("QML chart update - raw:", chartRawSeries.length, "filtered:", chartFilteredSeries.length, "peaks:", chartRPeaksSeries.length, "channel:", selectedChannelIndex)
+
+        updateSeries(rawSeriesLine, chartRawSeries)
+        updateSeries(filteredSeriesLine, chartFilteredSeries)
+        updateSeries(peaksSeries, chartRPeaksSeries)
+        rescaleChart()
+    }
+
+    function rescaleChart() {
+        if (!ekgController.hasData || typeof chartAxisX === "undefined" || typeof chartAxisY === "undefined")
+            return
+
+        var minY = Number.MAX_VALUE
+        var maxY = -Number.MAX_VALUE
+        var maxX = 0
+
+        function scan(series) {
+            for (var i = 0; i < series.length; ++i) {
+                var p = series[i]
+                if (!p) continue
+                if (p.y < minY) minY = p.y
+                if (p.y > maxY) maxY = p.y
+                if (p.x > maxX) maxX = p.x
+            }
+        }
+
+        scan(chartRawSeries)
+        scan(chartFilteredSeries)
+        scan(chartRPeaksSeries)
+
+        if (minY === Number.MAX_VALUE || maxY === -Number.MAX_VALUE) {
+            minY = -1
+            maxY = 1
+        } else if (minY === maxY) {
+            minY -= 0.5
+            maxY += 0.5
+        }
+
+        chartAxisX.min = 0
+        chartAxisX.max = maxX > 0 ? maxX : 1
+        chartAxisY.min = minY
+        chartAxisY.max = maxY
+    }
 
     property string currentModule: "ECG BASELINE"
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
         fakeProgress.stop()
         analysisProgress.value = 0
+        refreshVisualization()
     }
 
     Connections {
         target: ekgController
         function onFileLoadSuccess(filename) {
             analysisProgress.value = 0
+            rebuildChannelOptions()
+            refreshVisualization()
         }
         function onFileLoadError(errorMessage) {
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
@@ -52,6 +172,7 @@ ApplicationWindow {
             analysisStatus.isProcessing = false
             fakeProgress.stop()
             analysisProgress.value = 100
+            refreshVisualization()
         }
         function onFilteringError(errorMessage) {
             analysisStatus.isProcessing = false
@@ -64,6 +185,7 @@ ApplicationWindow {
             analysisStatus.isProcessing = false
             fakeProgress.stop()
             analysisProgress.value = 100
+            refreshVisualization()
         }
         function onBaselineCompletedChanged() {
             if (ekgController.baselineCompleted) {
@@ -71,6 +193,7 @@ ApplicationWindow {
                 analysisStatus.isProcessing = false
                 fakeProgress.stop()
                 analysisProgress.value = 100
+                refreshVisualization()
             }
         }
         function onRPeaksCompletedChanged() {
@@ -79,6 +202,7 @@ ApplicationWindow {
                 analysisStatus.isProcessing = false
                 fakeProgress.stop()
                 analysisProgress.value = 100
+                refreshVisualization()
             }
         }
         function onRPeaksDetectionError(errorMessage) {
@@ -332,11 +456,122 @@ ApplicationWindow {
                     color: vizBg
                     border.color: vizBorder
                     border.width: 1
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
 
-                    Label {
-                        anchors.centerIn: parent
-                        text: "Tutaj moduł Visualization wstawi wykresy EKG."
-                        color: textSecondary
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            ComboBox {
+                                id: channelCombo
+                                model: channelOptions
+                                Layout.preferredWidth: 150
+                                enabled: model.length > 0
+                                currentIndex: selectedChannelIndex
+                                onActivated: {
+                                    selectedChannelIndex = currentIndex
+                                    refreshVisualization()
+                                }
+                            }
+
+                            Button {
+                                text: "Odśwież"
+                                onClicked: refreshVisualization()
+                            }
+
+                            Button {
+                                text: "Eksportuj PNG"
+                                enabled: ekgController.hasData
+                                onClicked: exportDialog.open()
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            ChartView {
+                                id: signalChart
+                                anchors.fill: parent
+                                antialiasing: true
+                                theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                backgroundColor: vizBg
+                                legend.visible: true
+                                legend.alignment: Qt.AlignTop
+                                legend.labelColor: textSecondary
+                                enabled: ekgController.hasData
+
+                                ValueAxis {
+                                    id: chartAxisX
+                                    titleText: "Czas [s]"
+                                    labelFormat: "%.2f"
+                                    labelsColor: textSecondary
+                                    gridVisible: false
+                                }
+
+                                ValueAxis {
+                                    id: chartAxisY
+                                    titleText: "Amplituda [mV]"
+                                    labelsColor: textSecondary
+                                }
+
+                                LineSeries {
+                                    id: rawSeriesLine
+                                    name: "Sygnał surowy"
+                                    color: "#60a5fa"
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: chartRawSeries.length > 0
+                                }
+
+                                LineSeries {
+                                    id: filteredSeriesLine
+                                    name: "Sygnał filtrowany"
+                                    color: "#10b981"
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: chartFilteredSeries.length > 0
+                                }
+
+                                ScatterSeries {
+                                    id: peaksSeries
+                                    name: "Piki R"
+                                    color: "#ef4444"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 8
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: chartRPeaksSeries.length > 0 && window.currentModule === "R PEAKS"
+                                }
+                            }
+
+                            Label {
+                                anchors.centerIn: parent
+                                visible: !ekgController.hasData || (chartRawSeries.length === 0 && chartFilteredSeries.length === 0)
+                                text: "Załaduj plik EKG, aby zobaczyć wizualizację."
+                                color: textSecondary
+                            }
+                        }
+                    }
+
+                    FileDialog {
+                        id: exportDialog
+                        title: "Zapisz wykres do pliku"
+                        fileMode: FileDialog.SaveFile
+                        nameFilters: ["PNG (*.png)"]
+                        onAccepted: {
+                            if (selectedFile && signalChart) {
+                                var target = selectedFile.toString()
+                                if (!target.toLowerCase().endsWith(".png"))
+                                    target = target + ".png"
+                                signalChart.grabToImage(function(result) {
+                                    result.saveToFile(target)
+                                })
+                            }
+                        }
                     }
                 }
             }
@@ -526,6 +761,11 @@ ApplicationWindow {
                             fakeProgress.stop()
                             statusResetTimer.stop()
                             analysisProgress.value = 0
+                            ekgController.resetBaseline()
+                            chartRawSeries = ekgController.getRawSeries(selectedChannelIndex, maxPlottedPoints)
+                            chartFilteredSeries = []
+                            chartRPeaksSeries = []
+                            applySeriesToChart()
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
                                 paramsLoader.item.resetState()
