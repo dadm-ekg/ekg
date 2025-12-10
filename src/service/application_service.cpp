@@ -37,7 +37,8 @@ bool ApplicationService::Load(const QString &filename) {
     hrv_dfa_processing_service_->Process(filtered_signal_dataset, dataset->frequency);
     hrv_geo_processing_service_->Process(detected_r_peaks, dataset->frequency);
     heart_class_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
-    waves_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
+    const auto waves = waves_detection_service_->Detect(filtered_signal_dataset, dataset->frequency);
+    std::cout << waves.data()->p_wave_end;
     // TODO(Mati W.): trzeba uzupełnić
 }
 
