@@ -45,6 +45,7 @@ ApplicationWindow {
     property var hrvGeoMetrics: ({})
     property var hrvGeoHistogram: []
     property var hrvPoincarePoints: []
+    property bool chartLoading: false
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -63,6 +64,7 @@ ApplicationWindow {
     }
 
     function refreshVisualization() {
+        chartLoading = true
         if (!ekgController.hasData) {
             chartRawSeries = []
             chartFilteredSeries = []
@@ -82,6 +84,11 @@ ApplicationWindow {
         chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
         Qt.callLater(applySeriesToChart)
         Qt.callLater(refreshHrvCharts)
+        chartLoading = false
+    }
+
+    function scheduleVisualizationRefresh() {
+        vizDebounce.restart()
     }
 
     function applySeriesToChart() {
@@ -199,12 +206,17 @@ ApplicationWindow {
         hrvPowerBarSet.replace(0, vlf)
         hrvPowerBarSet.replace(1, lf)
         hrvPowerBarSet.replace(2, hf)
+        var ymax = Math.max(vlf, lf, hf, 1)
+        hrvTimeAxisY.max = ymax
     }
 
     function applyHrvGeoCharts() {
         if (typeof hrvHistogramSeries === "undefined" || typeof hrvPoincareSeries === "undefined")
             return
 
+        var minHistX = Number.MAX_VALUE
+        var maxHistX = -Number.MAX_VALUE
+        var maxHistY = -Number.MAX_VALUE
         hrvHistogramSeries.clear()
         for (var i = 0; i < hrvGeoHistogram.length; ++i) {
             var p = hrvGeoHistogram[i]
@@ -213,8 +225,19 @@ ApplicationWindow {
             var by = Number(p.y !== undefined ? p.y : p["y"])
             if (isNaN(bx) || isNaN(by)) continue
             hrvHistogramSeries.append(bx, by)
+            if (bx < minHistX) minHistX = bx
+            if (bx > maxHistX) maxHistX = bx
+            if (by > maxHistY) maxHistY = by
         }
+        hrvHistAxisX.min = (minHistX === Number.MAX_VALUE) ? 0 : minHistX
+        hrvHistAxisX.max = (maxHistX === -Number.MAX_VALUE) ? 1 : maxHistX
+        hrvHistAxisY.min = 0
+        hrvHistAxisY.max = (maxHistY === -Number.MAX_VALUE) ? 1 : maxHistY
 
+        var minPx = Number.MAX_VALUE
+        var maxPx = -Number.MAX_VALUE
+        var minPy = Number.MAX_VALUE
+        var maxPy = -Number.MAX_VALUE
         hrvPoincareSeries.clear()
         for (var j = 0; j < hrvPoincarePoints.length; ++j) {
             var pp = hrvPoincarePoints[j]
@@ -223,6 +246,23 @@ ApplicationWindow {
             var py = Number(pp.y !== undefined ? pp.y : pp["y"])
             if (isNaN(px) || isNaN(py)) continue
             hrvPoincareSeries.append(px, py)
+            if (px < minPx) minPx = px
+            if (px > maxPx) maxPx = px
+            if (py < minPy) minPy = py
+            if (py > maxPy) maxPy = py
+        }
+
+        if (minPx === Number.MAX_VALUE || maxPx === -Number.MAX_VALUE) {
+            poincareAxisX.min = 0; poincareAxisX.max = 1
+        } else {
+            poincareAxisX.min = minPx
+            poincareAxisX.max = maxPx === minPx ? maxPx + 1 : maxPx
+        }
+        if (minPy === Number.MAX_VALUE || maxPy === -Number.MAX_VALUE) {
+            poincareAxisY.min = 0; poincareAxisY.max = 1
+        } else {
+            poincareAxisY.min = minPy
+            poincareAxisY.max = maxPy === minPy ? maxPy + 1 : maxPy
         }
     }
 
@@ -335,6 +375,13 @@ ApplicationWindow {
             analysisStatus.text = tempStatusText
             analysisStatus.color = tempStatusColor
         }
+    }
+
+    Timer {
+        id: vizDebounce
+        interval: 60
+        repeat: false
+        onTriggered: refreshVisualization()
     }
 
     header: ToolBar {
@@ -576,7 +623,7 @@ ApplicationWindow {
                                 currentIndex: selectedChannelIndex
                                 onActivated: {
                                     selectedChannelIndex = currentIndex
-                                    refreshVisualization()
+                                    scheduleVisualizationRefresh()
                                 }
                             }
 
@@ -683,6 +730,35 @@ ApplicationWindow {
                                 visible: !ekgController.hasData || (chartRawSeries.length === 0 && chartFilteredSeries.length === 0)
                                 text: "Załaduj plik EKG, aby zobaczyć wizualizację."
                                 color: textSecondary
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: "transparent"
+                                visible: chartLoading
+                                z: 2
+
+                                Rectangle {
+                                    width: parent.width * 0.4
+                                    height: 8
+                                    radius: 4
+                                    color: borderColor
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    Rectangle {
+                                        id: loadingBarFill
+                                        height: parent.height
+                                        radius: parent.radius
+                                        width: parent.width * 0.2
+                                        color: Material.color(Material.Teal)
+                                        SequentialAnimation on x {
+                                            loops: Animation.Infinite
+                                            NumberAnimation { from: 0; to: parent.width - loadingBarFill.width; duration: 700; easing.type: Easing.InOutQuad }
+                                            NumberAnimation { from: parent.width - loadingBarFill.width; to: 0; duration: 700; easing.type: Easing.InOutQuad }
+                                        }
+                                    }
+                                }
                             }
                         }
 

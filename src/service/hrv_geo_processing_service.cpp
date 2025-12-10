@@ -30,6 +30,8 @@ HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<RPeaksAnnotated
         return metrics;
     }
 
+    metrics.rr_intervals = rr_intervals;
+
     // HISTOGRAM RR
     double min_rr = *std::min_element(rr_intervals.begin(), rr_intervals.end());
     double max_rr = *std::max_element(rr_intervals.begin(), rr_intervals.end());
@@ -45,6 +47,8 @@ HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<RPeaksAnnotated
         }
     }
     metrics.histogram = histogram;
+    metrics.rr_min = min_rr;
+    metrics.bin_width = bin_width;
 
     // TRIANGULAR INDEX i TiNN
     auto max_histogram_it = std::max_element(histogram.begin(), histogram.end());

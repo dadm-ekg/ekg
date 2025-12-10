@@ -329,26 +329,20 @@ QVariantMap EkgController::getHrvGeoMetrics() const {
     out.insert("tinn", metrics.tinn);
     out.insert("sd1", metrics.sd1);
     out.insert("sd2", metrics.sd2);
+    out.insert("rr_min", metrics.rr_min);
+    out.insert("bin_width", metrics.bin_width);
     return out;
 }
 
 QVariantList EkgController::getHrvGeoHistogram(int binWidthMs) const {
     QVariantList hist;
-    if (binWidthMs <= 0) binWidthMs = 5;
-    auto rr = computeRR(application_service_->GetRPeaks(), samplingFrequency());
-    if (rr.empty()) return hist;
-    double min_rr = *std::min_element(rr.begin(), rr.end());
-    double max_rr = *std::max_element(rr.begin(), rr.end());
-    int numBins = static_cast<int>(std::ceil((max_rr - min_rr) / binWidthMs)) + 1;
-    std::vector<int> bins(numBins, 0);
-    for (double v : rr) {
-        int bin = static_cast<int>((v - min_rr) / binWidthMs);
-        if (bin >= 0 && bin < numBins) bins[bin]++;
-    }
-    for (int i = 0; i < numBins; ++i) {
+    auto metrics = application_service_->CalculateHRVGeo();
+    if (binWidthMs <= 0) binWidthMs = static_cast<int>(metrics.bin_width > 0 ? metrics.bin_width : 5);
+    if (metrics.histogram.empty()) return hist;
+    for (size_t i = 0; i < metrics.histogram.size(); ++i) {
         QVariantMap p;
-        p["x"] = min_rr + i * binWidthMs;
-        p["y"] = bins[i];
+        p["x"] = metrics.rr_min + static_cast<double>(i) * metrics.bin_width;
+        p["y"] = metrics.histogram[i];
         hist.append(p);
     }
     return hist;
@@ -356,7 +350,8 @@ QVariantList EkgController::getHrvGeoHistogram(int binWidthMs) const {
 
 QVariantList EkgController::getHrvPoincarePoints() const {
     QVariantList pts;
-    auto rr = computeRR(application_service_->GetRPeaks(), samplingFrequency());
+    auto metrics = application_service_->CalculateHRVGeo();
+    const auto &rr = metrics.rr_intervals;
     if (rr.size() < 2) return pts;
     for (size_t i = 1; i < rr.size(); ++i) {
         QVariantMap p;
