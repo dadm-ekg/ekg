@@ -149,6 +149,23 @@ ApplicationWindow {
         chartAxisY.max = maxY
     }
 
+    function chartDurationSec() {
+        if (chartFilteredSeries.length < 2)
+            return 0
+        var firstX = Number(chartFilteredSeries[0].x !== undefined ? chartFilteredSeries[0].x : chartFilteredSeries[0]["x"])
+        var lastX = Number(chartFilteredSeries[chartFilteredSeries.length - 1].x !== undefined ? chartFilteredSeries[chartFilteredSeries.length - 1].x : chartFilteredSeries[chartFilteredSeries.length - 1]["x"])
+        if (isNaN(firstX) || isNaN(lastX))
+            return 0
+        return Math.max(0, lastX - firstX)
+    }
+
+    function heartRateEstimate() {
+        var duration = chartDurationSec()
+        if (duration <= 0 || chartRPeaksSeries.length < 2)
+            return 0
+        return (chartRPeaksSeries.length / duration) * 60.0
+    }
+
     property string currentModule: "ECG BASELINE"
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
@@ -486,6 +503,33 @@ ApplicationWindow {
                                 text: "Eksportuj PNG"
                                 enabled: ekgController.hasData
                                 onClicked: exportDialog.open()
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+                            visible: window.currentModule === "R PEAKS"
+
+                            Label {
+                                text: "Piki R: " + chartRPeaksSeries.length
+                                color: textSecondary
+                            }
+
+                            Label {
+                                text: {
+                                    var bpm = heartRateEstimate()
+                                    return "HR (bpm): " + (bpm > 0 ? Math.round(bpm) : "-")
+                                }
+                                color: textSecondary
+                            }
+
+                            Label {
+                                text: {
+                                    var dur = chartDurationSec()
+                                    return "Czas okna: " + (dur > 0 ? dur.toFixed(1) + " s" : "-")
+                                }
+                                color: textSecondary
                             }
                         }
 
