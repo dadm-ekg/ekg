@@ -165,7 +165,6 @@ ApplicationWindow {
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
         analysisProgress.value = 0
-        refreshVisualization()
     }
 
     Connections {
