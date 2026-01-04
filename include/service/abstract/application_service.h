@@ -9,6 +9,7 @@
 #include "../../dto/hrv_geo_metrics.h"
 #include "../../model/signal_dataset.h"
 #include "../../model/r_peaks_annotated_signal_datapoint.h"
+#include "../../model/wave_annotated_signal_datapoint.h"
 
 class IApplicationService {
 public:
@@ -26,6 +27,8 @@ public:
 
     virtual std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > GetRPeaks() const = 0;
 
+    virtual std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint> > GetWaves() const = 0;
+
     virtual bool RunFiltering(FilterMethod method) const = 0;
 
     virtual void ClearFilteredData() const = 0;
@@ -37,6 +40,8 @@ public:
     virtual HRVTimeMetrics CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const = 0;
 
     virtual HRVGeoMetrics CalculateHRVGeo() const = 0;
+
+    virtual bool CalculateWaves() const = 0;
 };
 
 #endif

@@ -12,20 +12,23 @@ ApplicationService::ApplicationService(
     std::shared_ptr<IFilterService> moving_average_filter_service,
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
-    std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service
+    std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
+    std::shared_ptr<IWavesDetectionService> waves_detection_service
 )
     : signal_repository_(std::move(signal_repository)),
       butterworth_filter_service_(std::move(butterworth_filter_service)),
       moving_average_filter_service_(std::move(moving_average_filter_service)),
       r_peaks_detection_service_(std::move(r_peaks_detection_service)),
       hrv_time_processing_service_(std::move(hrv_time_processing_service)),
-      hrv_geo_processing_service_(std::move(hrv_geo_processing_service)) {
+      hrv_geo_processing_service_(std::move(hrv_geo_processing_service)),
+      waves_detection_service_(std::move(waves_detection_service)) {
 }
 
 bool ApplicationService::Load(const QString &filename) {
     this->loaded_dataset = signal_repository_->Load(filename);
     this->filtered_dataset = nullptr;
     this->r_peaks = nullptr;
+    this->waves = nullptr;
     const QFileInfo fileInfo(filename);
     this->loaded_filename = fileInfo.completeBaseName();
     return true;
@@ -51,12 +54,17 @@ std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > ApplicationService
     return this->r_peaks;
 }
 
+std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint> > ApplicationService::GetWaves() const {
+    return this->waves;
+}
+
 bool ApplicationService::RunFiltering(FilterMethod method) const {
     if (this->loaded_dataset == nullptr) return false;
     
     this->filtered_dataset = std::make_shared<SignalDataset>();
     this->filtered_dataset->frequency = this->loaded_dataset->frequency;
     this->r_peaks = nullptr;
+    this->waves = nullptr;
     
     if (method == Butterworth) {
         this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values);
@@ -70,6 +78,7 @@ bool ApplicationService::RunFiltering(FilterMethod method) const {
 void ApplicationService::ClearFilteredData() const {
     this->filtered_dataset = nullptr;
     this->r_peaks = nullptr;
+    this->waves = nullptr;
 }
 
 void ApplicationService::ClearRPeaks() const {
@@ -110,4 +119,17 @@ HRVGeoMetrics ApplicationService::CalculateHRVGeo() const {
         *r_peaks,
         filtered_dataset->frequency
     );
+}
+
+bool ApplicationService::CalculateWaves() const {
+    if (filtered_dataset == nullptr) return false;
+    
+    auto detected_waves = waves_detection_service_->Detect(
+        filtered_dataset->values,
+        filtered_dataset->frequency
+    );
+    
+    this->waves = std::make_shared<std::vector<WaveAnnotatedSignalDatapoint>>(detected_waves);
+    
+    return true;
 }

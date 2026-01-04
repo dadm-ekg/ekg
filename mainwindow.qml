@@ -40,9 +40,11 @@ ApplicationWindow {
     property string lastUsedRPeaksMethod: ""
     property string lastUsedHRVTimeMethod: ""
     property bool hrvGeoRan: false
+    property bool wavesRan: false
     property int selectedFilterMethod: -1
     property int selectedRPeaksMethod: -1
     property int selectedHRVTimeMethod: -1
+    property var chartWaveMarkers: {}
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -78,6 +80,7 @@ ApplicationWindow {
             chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
             chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
             chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
+            chartWaveMarkers = ekgController.getWaveMarkers(channel)
             Qt.callLater(applySeriesToChart)
         })
     }
@@ -122,6 +125,26 @@ ApplicationWindow {
         updateSeries(rawSeriesLine, chartRawSeries)
         updateSeries(filteredSeriesLine, chartFilteredSeries)
         updateSeries(peaksSeries, chartRPeaksSeries)
+        
+        if (chartWaveMarkers && window.currentModule === "WAVES") {
+            updateSeries(pOnsetSeries, chartWaveMarkers.p_onsets || [])
+            updateSeries(pEndSeries, chartWaveMarkers.p_ends || [])
+            updateSeries(qrsOnsetSeries, chartWaveMarkers.qrs_onsets || [])
+            updateSeries(qrsEndSeries, chartWaveMarkers.qrs_ends || [])
+            updateSeries(tEndSeries, chartWaveMarkers.t_ends || [])
+        } else {
+            pOnsetSeries.clear()
+            pEndSeries.clear()
+            qrsOnsetSeries.clear()
+            qrsEndSeries.clear()
+            tEndSeries.clear()
+            pOnsetSeries.visible = false
+            pEndSeries.visible = false
+            qrsOnsetSeries.visible = false
+            qrsEndSeries.visible = false
+            tEndSeries.visible = false
+        }
+        
         rescaleChart()
         chartLoading = false
     }
@@ -179,6 +202,8 @@ ApplicationWindow {
             selectedRPeaksMethod = -1
             selectedHRVTimeMethod = -1
             hrvGeoRan = false
+            wavesRan = false
+            chartWaveMarkers = {}
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -253,6 +278,24 @@ ApplicationWindow {
             if (ekgController.hrvGeoCompleted) {
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
+            }
+        }
+        function onWavesSuccess() {
+            wavesRan = true
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 100
+            refreshVisualization()
+        }
+        function onWavesError(errorMessage) {
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 0
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+        function onWavesCompletedChanged() {
+            if (ekgController.wavesCompleted) {
+                analysisStatus.isProcessing = false
+                analysisProgress.value = 100
+                refreshVisualization()
             }
         }
     }
@@ -451,6 +494,7 @@ ApplicationWindow {
                     model: [
                         "ECG BASELINE",
                         "R PEAKS",
+                        "WAVES",
                         "HRV TIME",
                         "HRV GEO"
                     ]
@@ -578,6 +622,61 @@ ApplicationWindow {
                                     axisY: chartAxisY
                                     visible: chartRPeaksSeries.length > 0 && window.currentModule === "R PEAKS"
                                 }
+
+                                ScatterSeries {
+                                    id: pOnsetSeries
+                                    name: "P onset"
+                                    color: "#f59e0b"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                                }
+
+                                ScatterSeries {
+                                    id: pEndSeries
+                                    name: "P end"
+                                    color: "#eab308"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                                }
+
+                                ScatterSeries {
+                                    id: qrsOnsetSeries
+                                    name: "QRS onset"
+                                    color: "#8b5cf6"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                                }
+
+                                ScatterSeries {
+                                    id: qrsEndSeries
+                                    name: "QRS end"
+                                    color: "#a78bfa"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                                }
+
+                                ScatterSeries {
+                                    id: tEndSeries
+                                    name: "T end"
+                                    color: "#ec4899"
+                                    markerShape: ScatterSeries.MarkerShapeCircle
+                                    markerSize: 6
+                                    axisX: chartAxisX
+                                    axisY: chartAxisY
+                                    visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                                }
                             }
 
                             Label {
@@ -672,6 +771,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Label {
+                    visible: !ekgController.hasFilteredData && window.currentModule === "WAVES"
+                    text: "⚠️ Najpierw uruchom filtrowanie baseline"
+                    color: Material.color(Material.Orange)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -746,6 +853,19 @@ ApplicationWindow {
                                 } else {
                                     return "Obliczono metryki geometryczne"
                                 }
+                            } else if (module === "WAVES") {
+                                var wavesOK = ekgController.wavesCompleted
+                                if (!hasData) {
+                                    return "Oczekiwanie na plik"
+                                } else if (!hasFiltered) {
+                                    return "Oczekiwanie na filtrowanie"
+                                } else if (isProcessing) {
+                                    return "Przetwarzanie..."
+                                } else if (!wavesOK) {
+                                    return "Gotowy"
+                                } else {
+                                    return "Wykryto fale EKG"
+                                }
                             } else {
                                 return hasData ? "Oczekiwanie na analize" : "Oczekiwanie na import"
                             }
@@ -783,6 +903,13 @@ ApplicationWindow {
                                 if (isProcessing) return Material.color(Material.Orange)
                                 if (!hrvGeoOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
+                            } else if (module === "WAVES") {
+                                var wavesOK = ekgController.wavesCompleted
+                                if (!hasData) return textSecondary
+                                if (!hasFiltered) return textSecondary
+                                if (isProcessing) return Material.color(Material.Orange)
+                                if (!wavesOK) return Material.color(Material.Teal)
+                                return Material.color(Material.Green)
                             }
                             return textSecondary
                         }
@@ -810,6 +937,7 @@ ApplicationWindow {
                     sourceComponent:
                         window.currentModule === "ECG BASELINE" ? baselineParams :
                         window.currentModule === "R PEAKS"      ? rPeaksParams :
+                        window.currentModule === "WAVES"        ? wavesParams :
                         window.currentModule === "HRV TIME"     ? hrvTimeParams :
                         window.currentModule === "HRV GEO"      ? hrvGeoParams :
                         null
@@ -835,6 +963,8 @@ ApplicationWindow {
                                 return params && params.isReady && params.isReady()
                             } else if (window.currentModule === "HRV GEO") {
                                 return ekgController.rPeaksCompleted
+                            } else if (window.currentModule === "WAVES") {
+                                return ekgController.hasFilteredData
                             }
                             return true
                         }
@@ -856,6 +986,8 @@ ApplicationWindow {
                                 return "Wybierz metodę estymacji widma"
                             } else if (window.currentModule === "HRV GEO" && !ekgController.rPeaksCompleted) {
                                 return "Najpierw uruchom detekcję pików R"
+                            } else if (window.currentModule === "WAVES" && !ekgController.hasFilteredData) {
+                                return "Najpierw uruchom filtrowanie baseline"
                             }
                             return ""
                         }
@@ -878,6 +1010,10 @@ ApplicationWindow {
                                 if (paramsLoader.item && paramsLoader.item.runHRVGeo) {
                                     paramsLoader.item.runHRVGeo()
                                 }
+                            } else if (window.currentModule === "WAVES") {
+                                if (paramsLoader.item && paramsLoader.item.runWaves) {
+                                    paramsLoader.item.runWaves()
+                                }
                             }
                         }
                     }
@@ -895,20 +1031,33 @@ ApplicationWindow {
                                 lastUsedRPeaksMethod = ""
                                 lastUsedHRVTimeMethod = ""
                                 hrvGeoRan = false
+                                wavesRan = false
                                 selectedFilterMethod = -1
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
+                                chartWaveMarkers = {}
                                 filteredSeriesLine.clear()
                                 peaksSeries.clear()
+                                pOnsetSeries.clear()
+                                pEndSeries.clear()
+                                qrsOnsetSeries.clear()
+                                qrsEndSeries.clear()
+                                tEndSeries.clear()
                                 filteredSeriesLine.visible = false
                                 peaksSeries.visible = false
+                                pOnsetSeries.visible = false
+                                pEndSeries.visible = false
+                                qrsOnsetSeries.visible = false
+                                qrsEndSeries.visible = false
+                                tEndSeries.visible = false
                             } else if (window.currentModule === "R PEAKS") {
                                 ekgController.resetRPeaks()
                                 lastUsedRPeaksMethod = ""
                                 lastUsedHRVTimeMethod = ""
                                 hrvGeoRan = false
+                                wavesRan = false
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
                                 chartRPeaksSeries = []
@@ -921,16 +1070,41 @@ ApplicationWindow {
                             } else if (window.currentModule === "HRV GEO") {
                                 ekgController.resetHRVGeo()
                                 hrvGeoRan = false
+                            } else if (window.currentModule === "WAVES") {
+                                ekgController.resetWaves()
+                                wavesRan = false
+                                chartWaveMarkers = {}
+                                pOnsetSeries.clear()
+                                pEndSeries.clear()
+                                qrsOnsetSeries.clear()
+                                qrsEndSeries.clear()
+                                tEndSeries.clear()
+                                pOnsetSeries.visible = false
+                                pEndSeries.visible = false
+                                qrsOnsetSeries.visible = false
+                                qrsEndSeries.visible = false
+                                tEndSeries.visible = false
                             } else {
                                 chartRawSeries = []
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
+                                chartWaveMarkers = {}
                                 rawSeriesLine.clear()
                                 filteredSeriesLine.clear()
                                 peaksSeries.clear()
+                                pOnsetSeries.clear()
+                                pEndSeries.clear()
+                                qrsOnsetSeries.clear()
+                                qrsEndSeries.clear()
+                                tEndSeries.clear()
                                 rawSeriesLine.visible = false
                                 filteredSeriesLine.visible = false
                                 peaksSeries.visible = false
+                                pOnsetSeries.visible = false
+                                pEndSeries.visible = false
+                                qrsOnsetSeries.visible = false
+                                qrsEndSeries.visible = false
+                                tEndSeries.visible = false
                             }
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
@@ -1335,6 +1509,127 @@ ApplicationWindow {
         }
     }
 
+    Component {
+        id: wavesParams
+
+        ColumnLayout {
+            id: wavesRoot
+            Layout.fillWidth: true
+            spacing: 8
+
+            function isReady() {
+                return ekgController.hasFilteredData
+            }
+
+            function resetState() {
+            }
+
+            function runWaves() {
+                analysisStatus.isProcessing = true
+                chartLoading = true
+                analysisProgress.value = 0
+                ekgController.runWaves()
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: borderColor
+                visible: ekgController.wavesCompleted
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+            }
+
+            GridLayout {
+                visible: ekgController.wavesCompleted
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 6
+                Layout.fillWidth: true
+
+                Label {
+                    text: "Wykryte znaczniki:"
+                    font.bold: true
+                    font.pixelSize: 14
+                    Layout.columnSpan: 2
+                }
+
+                Label { text: "P onset:" }
+                Label {
+                    text: chartWaveMarkers.p_onsets ? chartWaveMarkers.p_onsets.length : "0"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "P end:" }
+                Label {
+                    text: chartWaveMarkers.p_ends ? chartWaveMarkers.p_ends.length : "0"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "QRS onset:" }
+                Label {
+                    text: chartWaveMarkers.qrs_onsets ? chartWaveMarkers.qrs_onsets.length : "0"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "QRS end:" }
+                Label {
+                    text: chartWaveMarkers.qrs_ends ? chartWaveMarkers.qrs_ends.length : "0"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "T end:" }
+                Label {
+                    text: chartWaveMarkers.t_ends ? chartWaveMarkers.t_ends.length : "0"
+                    color: Material.color(Material.Teal)
+                }
+            }
+
+            ColumnLayout {
+                visible: ekgController.wavesCompleted
+                Layout.fillWidth: true
+                spacing: 4
+                Layout.topMargin: 8
+
+                Label {
+                    text: "Legenda:"
+                    font.bold: true
+                    font.pixelSize: 14
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#f59e0b" }
+                    Label { text: "P onset"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#eab308" }
+                    Label { text: "P end"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#8b5cf6" }
+                    Label { text: "QRS onset"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#a78bfa" }
+                    Label { text: "QRS end"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#ec4899" }
+                    Label { text: "T end"; font.pixelSize: 12 }
+                }
+            }
+        }
+    }
+
     Dialog {
         id: helpDialog
         title: "Jak korzystac z EKG Analyzer"
@@ -1355,7 +1650,7 @@ ApplicationWindow {
             Label {
                 leftPadding: 8
                 text: "1. Wybierz plik EKG (Import sygnalu).\n" +
-                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, HRV TIME lub HRV GEO).\n" +
+                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, WAVES, HRV TIME lub HRV GEO).\n" +
                       "3. Ustaw parametry w prawym panelu.\n" +
                       "4. Kliknij 'Uruchom analize', aby przetworzyc sygnal.\n\n"
                 wrapMode: Text.WordWrap

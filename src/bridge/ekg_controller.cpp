@@ -27,6 +27,7 @@ void EkgController::loadData(const QString &filename) {
         r_peaks_completed_ = false;
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
+        waves_completed_ = false;
         emit loadedFilenameChanged();
         emit isFileLoadedChanged();
         emit hasDataChanged();
@@ -34,6 +35,7 @@ void EkgController::loadData(const QString &filename) {
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
+        emit wavesCompletedChanged();
         emit fileLoadSuccess(filename);
     } else {
         emit fileLoadError("Nie udało się załadować pliku");
@@ -92,11 +94,13 @@ bool EkgController::runBaseline(int filterMethod) {
         r_peaks_completed_ = false;
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
+        waves_completed_ = false;
         emit hasFilteredDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
+        emit wavesCompletedChanged();
         emit filteringSuccess(filterName);
     } else {
         emit filteringError("Nie udało się zastosować filtra " + filterName);
@@ -138,9 +142,11 @@ bool EkgController::runRPeaksDetection(int method) {
         r_peaks_completed_ = true;
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
+        waves_completed_ = false;
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
+        emit wavesCompletedChanged();
         emit rPeaksDetectionSuccess(methodName);
     } else {
         emit rPeaksDetectionError("Nie udało się wykryć pików R metodą " + methodName);
@@ -198,6 +204,25 @@ bool EkgController::runHRVGeo() {
     return true;
 }
 
+bool EkgController::runWaves() {
+    if (!hasFilteredData()) {
+        emit wavesError("Brak przefiltrowanych danych. Najpierw uruchom filtrowanie baseline.");
+        return false;
+    }
+
+    bool success = application_service_->CalculateWaves();
+
+    if (success) {
+        waves_completed_ = true;
+        emit wavesCompletedChanged();
+        emit wavesSuccess();
+    } else {
+        emit wavesError("Nie udało się wykryć fal EKG");
+    }
+
+    return success;
+}
+
 QString EkgController::loadedFilename() const {
     return application_service_->GetLoadedFilename();
 }
@@ -230,6 +255,10 @@ bool EkgController::hrvGeoCompleted() const {
     return hrv_geo_completed_;
 }
 
+bool EkgController::wavesCompleted() const {
+    return waves_completed_;
+}
+
 void EkgController::resetHRVTime() {
     hrv_time_completed_ = false;
     cached_hrv_metrics_ = HRVTimeMetrics{};
@@ -240,6 +269,11 @@ void EkgController::resetHRVGeo() {
     hrv_geo_completed_ = false;
     cached_hrv_geo_metrics_ = HRVGeoMetrics{};
     emit hrvGeoCompletedChanged();
+}
+
+void EkgController::resetWaves() {
+    waves_completed_ = false;
+    emit wavesCompletedChanged();
 }
 
 QStringList EkgController::getAvailableFiles() const {
@@ -291,11 +325,13 @@ void EkgController::resetBaseline() {
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
+    waves_completed_ = false;
     emit hasFilteredDataChanged();
     emit baselineCompletedChanged();
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
+    emit wavesCompletedChanged();
 }
 
 void EkgController::resetRPeaks() {
@@ -303,9 +339,11 @@ void EkgController::resetRPeaks() {
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
+    waves_completed_ = false;
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
+    emit wavesCompletedChanged();
 }
 
 namespace {
@@ -424,6 +462,70 @@ QVariantList EkgController::getHRVGeoPoincare() const {
         entry["y"] = rr[i + 1];
         result.append(entry);
     }
+    return result;
+}
+
+QVariantMap EkgController::getWaveMarkers(int channel) const {
+    QVariantMap result;
+    QVariantList pOnsets, pEnds, qrsOnsets, qrsEnds, tEnds;
+
+    const auto waves = application_service_->GetWaves();
+    if (!waves || waves->empty()) return result;
+
+    const auto filtered = application_service_->GetFilteredData();
+    if (!filtered || filtered->values.empty()) return result;
+
+    const int channelCount = static_cast<int>(filtered->values.front().channelValues.size());
+    if (channelCount == 0) return result;
+
+    const int clampedChannel = std::max(0, std::min(channel, channelCount - 1));
+    const double frequency = filtered->frequency > 0 ? static_cast<double>(filtered->frequency) : 1.0;
+
+    for (size_t i = 0; i < waves->size(); ++i) {
+        const auto& wave = (*waves)[i];
+        if (static_cast<size_t>(clampedChannel) >= wave.channelValues.size()) continue;
+        
+        const double t = static_cast<double>(i) / frequency;
+        const double y = static_cast<double>(wave.channelValues[static_cast<size_t>(clampedChannel)]);
+
+        if (wave.p_wave_onset) {
+            QVariantMap entry;
+            entry["x"] = t;
+            entry["y"] = y;
+            pOnsets.append(entry);
+        }
+        if (wave.p_wave_end) {
+            QVariantMap entry;
+            entry["x"] = t;
+            entry["y"] = y;
+            pEnds.append(entry);
+        }
+        if (wave.qrs_onset) {
+            QVariantMap entry;
+            entry["x"] = t;
+            entry["y"] = y;
+            qrsOnsets.append(entry);
+        }
+        if (wave.qrs_end) {
+            QVariantMap entry;
+            entry["x"] = t;
+            entry["y"] = y;
+            qrsEnds.append(entry);
+        }
+        if (wave.t_end) {
+            QVariantMap entry;
+            entry["x"] = t;
+            entry["y"] = y;
+            tEnds.append(entry);
+        }
+    }
+
+    result["p_onsets"] = pOnsets;
+    result["p_ends"] = pEnds;
+    result["qrs_onsets"] = qrsOnsets;
+    result["qrs_ends"] = qrsEnds;
+    result["t_ends"] = tEnds;
+
     return result;
 }
 
