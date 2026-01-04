@@ -124,9 +124,16 @@ ApplicationWindow {
 
         updateSeries(rawSeriesLine, chartRawSeries)
         updateSeries(filteredSeriesLine, chartFilteredSeries)
-        updateSeries(peaksSeries, chartRPeaksSeries)
         
-        if (chartWaveMarkers && window.currentModule === "WAVES") {
+        if (window.currentModule === "R PEAKS") {
+            updateSeries(peaksSeries, chartRPeaksSeries)
+            peaksSeries.visible = chartRPeaksSeries.length > 0
+        } else {
+            peaksSeries.clear()
+            peaksSeries.visible = false
+        }
+        
+        if (window.currentModule === "WAVES") {
             updateSeries(pOnsetSeries, chartWaveMarkers.p_onsets || [])
             updateSeries(pEndSeries, chartWaveMarkers.p_ends || [])
             updateSeries(qrsOnsetSeries, chartWaveMarkers.qrs_onsets || [])
@@ -189,6 +196,7 @@ ApplicationWindow {
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
         analysisProgress.value = 0
+        Qt.callLater(applySeriesToChart)
     }
 
     Connections {
