@@ -672,17 +672,6 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
-                Loader {
-                    id: paramsLoader
-                    Layout.fillWidth: true
-                    sourceComponent:
-                        window.currentModule === "ECG BASELINE" ? baselineParams :
-                        window.currentModule === "R PEAKS"      ? rPeaksParams :
-                        window.currentModule === "HRV TIME"     ? hrvTimeParams :
-                        window.currentModule === "HRV GEO"      ? hrvGeoParams :
-                        null
-                }
-
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -813,6 +802,17 @@ ApplicationWindow {
                         value: 0
                         Layout.fillWidth: true
                     }
+                }
+
+                Loader {
+                    id: paramsLoader
+                    Layout.fillWidth: true
+                    sourceComponent:
+                        window.currentModule === "ECG BASELINE" ? baselineParams :
+                        window.currentModule === "R PEAKS"      ? rPeaksParams :
+                        window.currentModule === "HRV TIME"     ? hrvTimeParams :
+                        window.currentModule === "HRV GEO"      ? hrvGeoParams :
+                        null
                 }
 
                 Item { Layout.fillHeight: true }
@@ -1144,7 +1144,7 @@ ApplicationWindow {
             }
 
             Label {
-                text: "Wybierz metode estymacji widma:"
+                text: "Metoda estymacji widma:"
                 color: textSecondary
                 font.pixelSize: 13
             }
@@ -1277,20 +1277,6 @@ ApplicationWindow {
                 ekgController.runHRVGeo()
             }
 
-            Label {
-                text: "Metryki geometryczne HRV"
-                font.bold: true
-                font.pixelSize: 14
-            }
-
-            Label {
-                text: "Ten modul oblicza metryki geometryczne na podstawie wykrytych pikow R."
-                color: textSecondary
-                font.pixelSize: 12
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-            }
-
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
@@ -1308,7 +1294,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "Indeks trojkatny:"
+                    text: "Metryki trojkatne:"
                     font.bold: true
                     font.pixelSize: 14
                     Layout.columnSpan: 2
@@ -1327,7 +1313,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Poincare (SD):"
+                    text: "Metryki Poincare:"
                     font.bold: true
                     font.pixelSize: 14
                     Layout.columnSpan: 2
@@ -1412,3 +1398,4 @@ ApplicationWindow {
         }
     }
 }
+
