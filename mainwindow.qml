@@ -12,13 +12,8 @@ ApplicationWindow {
     visible: true
     title: "EKG Analyzer"
 
-
-
-
-    //sterowanie motywem
     property bool isDarkTheme: true
 
-    //kolory zależne od motywu
     property color bgMain:        isDarkTheme ? "#020712" : "#f3f4f6"
     property color panelColor:    isDarkTheme ? "#050d18" : "#ffffff"
     property color borderColor:   isDarkTheme ? "#1f2933" : "#d1d5db"
@@ -26,9 +21,7 @@ ApplicationWindow {
     property color vizBg:         isDarkTheme ? "#020812" : "#f9fafb"
     property color vizBorder:     isDarkTheme ? "#0f172a" : "#d1d5db"
 
-    //kolor tekstu / ikon w przyciskach na pasku
     property color buttonTextColor: isDarkTheme ? "#f9fafb" : "#111827"
-
 
     color: bgMain
     Material.theme: isDarkTheme ? Material.Dark : Material.Light
@@ -41,11 +34,10 @@ ApplicationWindow {
     property int selectedChannelIndex: 0
     property int maxPlottedPoints: 4000
     property var channelOptions: []
-    property var hrvTimeMetrics: ({})
-    property var hrvGeoMetrics: ({})
-    property var hrvGeoHistogram: []
-    property var hrvPoincarePoints: []
     property bool chartLoading: false
+    property string pendingFileName: ""
+    property string lastUsedFilter: ""
+    property string lastUsedRPeaksMethod: ""
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -64,27 +56,25 @@ ApplicationWindow {
     }
 
     function refreshVisualization() {
-        chartLoading = true
         if (!ekgController.hasData) {
             chartRawSeries = []
             chartFilteredSeries = []
             chartRPeaksSeries = []
+            chartLoading = false
             Qt.callLater(applySeriesToChart)
-            hrvTimeMetrics = ({})
-            hrvGeoMetrics = ({})
-            hrvGeoHistogram = []
-            hrvPoincarePoints = []
-            Qt.callLater(applyHrvCharts)
             return
         }
 
-        var channel = clampChannelIndex(selectedChannelIndex)
-        chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
-        chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
-        chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
-        Qt.callLater(applySeriesToChart)
-        Qt.callLater(refreshHrvCharts)
-        chartLoading = false
+        if (!chartLoading) {
+            chartLoading = true
+        }
+        Qt.callLater(function() {
+            var channel = clampChannelIndex(selectedChannelIndex)
+            chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
+            chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
+            chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
+            Qt.callLater(applySeriesToChart)
+        })
     }
 
     function scheduleVisualizationRefresh() {
@@ -128,6 +118,7 @@ ApplicationWindow {
         updateSeries(filteredSeriesLine, chartFilteredSeries)
         updateSeries(peaksSeries, chartRPeaksSeries)
         rescaleChart()
+        chartLoading = false
     }
 
     function rescaleChart() {
@@ -166,141 +157,19 @@ ApplicationWindow {
         chartAxisY.max = maxY
     }
 
-    function refreshHrvTime() {
-        if (!ekgController.hasFilteredData || !ekgController.rPeaksCompleted) {
-            hrvTimeMetrics = ({})
-            return
-        }
-        hrvTimeMetrics = ekgController.getHrvTimeMetrics(0)
-        Qt.callLater(applyHrvTimeChart)
-    }
-
-    function refreshHrvGeo() {
-        if (!ekgController.hasFilteredData || !ekgController.rPeaksCompleted) {
-            hrvGeoMetrics = ({})
-            hrvGeoHistogram = []
-            hrvPoincarePoints = []
-            Qt.callLater(applyHrvGeoCharts)
-            return
-        }
-        hrvGeoMetrics = ekgController.getHrvGeoMetrics()
-        hrvGeoHistogram = ekgController.getHrvGeoHistogram()
-        hrvPoincarePoints = ekgController.getHrvPoincarePoints()
-        Qt.callLater(applyHrvGeoCharts)
-    }
-
-    function refreshHrvCharts() {
-        if (window.currentModule === "HRV1")
-            refreshHrvTime()
-        else if (window.currentModule === "HRV2")
-            refreshHrvGeo()
-    }
-
-    function applyHrvTimeChart() {
-        if (typeof hrvPowerBarSet === "undefined")
-            return
-
-        var vlf = Number(hrvTimeMetrics.vlf || 0)
-        var lf = Number(hrvTimeMetrics.lf || 0)
-        var hf = Number(hrvTimeMetrics.hf || 0)
-        hrvPowerBarSet.replace(0, vlf)
-        hrvPowerBarSet.replace(1, lf)
-        hrvPowerBarSet.replace(2, hf)
-        var ymax = Math.max(vlf, lf, hf, 1)
-        hrvTimeAxisY.max = ymax
-    }
-
-    function applyHrvGeoCharts() {
-        if (typeof hrvHistogramSeries === "undefined" || typeof hrvPoincareSeries === "undefined")
-            return
-
-        var minHistX = Number.MAX_VALUE
-        var maxHistX = -Number.MAX_VALUE
-        var maxHistY = -Number.MAX_VALUE
-        hrvHistogramSeries.clear()
-        for (var i = 0; i < hrvGeoHistogram.length; ++i) {
-            var p = hrvGeoHistogram[i]
-            if (!p) continue
-            var bx = Number(p.x !== undefined ? p.x : p["x"])
-            var by = Number(p.y !== undefined ? p.y : p["y"])
-            if (isNaN(bx) || isNaN(by)) continue
-            hrvHistogramSeries.append(bx, by)
-            if (bx < minHistX) minHistX = bx
-            if (bx > maxHistX) maxHistX = bx
-            if (by > maxHistY) maxHistY = by
-        }
-        hrvHistAxisX.min = (minHistX === Number.MAX_VALUE) ? 0 : minHistX
-        hrvHistAxisX.max = (maxHistX === -Number.MAX_VALUE) ? 1 : maxHistX
-        hrvHistAxisY.min = 0
-        hrvHistAxisY.max = (maxHistY === -Number.MAX_VALUE) ? 1 : maxHistY
-
-        var minPx = Number.MAX_VALUE
-        var maxPx = -Number.MAX_VALUE
-        var minPy = Number.MAX_VALUE
-        var maxPy = -Number.MAX_VALUE
-        hrvPoincareSeries.clear()
-        for (var j = 0; j < hrvPoincarePoints.length; ++j) {
-            var pp = hrvPoincarePoints[j]
-            if (!pp) continue
-            var px = Number(pp.x !== undefined ? pp.x : pp["x"])
-            var py = Number(pp.y !== undefined ? pp.y : pp["y"])
-            if (isNaN(px) || isNaN(py)) continue
-            hrvPoincareSeries.append(px, py)
-            if (px < minPx) minPx = px
-            if (px > maxPx) maxPx = px
-            if (py < minPy) minPy = py
-            if (py > maxPy) maxPy = py
-        }
-
-        if (minPx === Number.MAX_VALUE || maxPx === -Number.MAX_VALUE) {
-            poincareAxisX.min = 0; poincareAxisX.max = 1
-        } else {
-            poincareAxisX.min = minPx
-            poincareAxisX.max = maxPx === minPx ? maxPx + 1 : maxPx
-        }
-        if (minPy === Number.MAX_VALUE || maxPy === -Number.MAX_VALUE) {
-            poincareAxisY.min = 0; poincareAxisY.max = 1
-        } else {
-            poincareAxisY.min = minPy
-            poincareAxisY.max = maxPy === minPy ? maxPy + 1 : maxPy
-        }
-    }
-
-    function applyHrvCharts() {
-        applyHrvTimeChart()
-        applyHrvGeoCharts()
-    }
-
-    function chartDurationSec() {
-        if (chartFilteredSeries.length < 2)
-            return 0
-        var firstX = Number(chartFilteredSeries[0].x !== undefined ? chartFilteredSeries[0].x : chartFilteredSeries[0]["x"])
-        var lastX = Number(chartFilteredSeries[chartFilteredSeries.length - 1].x !== undefined ? chartFilteredSeries[chartFilteredSeries.length - 1].x : chartFilteredSeries[chartFilteredSeries.length - 1]["x"])
-        if (isNaN(firstX) || isNaN(lastX))
-            return 0
-        return Math.max(0, lastX - firstX)
-    }
-
-    function heartRateEstimate() {
-        var duration = chartDurationSec()
-        if (duration <= 0 || chartRPeaksSeries.length < 2)
-            return 0
-        return (chartRPeaksSeries.length / duration) * 60.0
-    }
-
     property string currentModule: "ECG BASELINE"
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
-        fakeProgress.stop()
         analysisProgress.value = 0
         refreshVisualization()
-        refreshHrvCharts()
     }
 
     Connections {
         target: ekgController
         function onFileLoadSuccess(filename) {
             analysisProgress.value = 0
+            lastUsedFilter = ""
+            lastUsedRPeaksMethod = ""
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -308,49 +177,40 @@ ApplicationWindow {
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
         function onFilteringSuccess(filterName) {
-            console.log("Filtering success signal received")
+            lastUsedFilter = filterName
             analysisStatus.isProcessing = false
-            fakeProgress.stop()
             analysisProgress.value = 100
             refreshVisualization()
         }
         function onFilteringError(errorMessage) {
             analysisStatus.isProcessing = false
-            fakeProgress.stop()
+            chartLoading = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
         function onRPeaksDetectionSuccess(methodName) {
-            console.log("R peaks detection success signal received")
+            lastUsedRPeaksMethod = methodName
             analysisStatus.isProcessing = false
-            fakeProgress.stop()
             analysisProgress.value = 100
             refreshVisualization()
-            refreshHrvCharts()
         }
         function onBaselineCompletedChanged() {
             if (ekgController.baselineCompleted) {
-                console.log("Baseline completed changed to true")
                 analysisStatus.isProcessing = false
-                fakeProgress.stop()
                 analysisProgress.value = 100
                 refreshVisualization()
-                refreshHrvCharts()
             }
         }
         function onRPeaksCompletedChanged() {
             if (ekgController.rPeaksCompleted) {
-                console.log("R peaks completed changed to true")
                 analysisStatus.isProcessing = false
-                fakeProgress.stop()
                 analysisProgress.value = 100
                 refreshVisualization()
-                refreshHrvCharts()
             }
         }
         function onRPeaksDetectionError(errorMessage) {
             analysisStatus.isProcessing = false
-            fakeProgress.stop()
+            chartLoading = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
@@ -379,7 +239,7 @@ ApplicationWindow {
 
     Timer {
         id: vizDebounce
-        interval: 60
+        interval: 150
         repeat: false
         onTriggered: refreshVisualization()
     }
@@ -413,13 +273,11 @@ ApplicationWindow {
                 Material.foreground: window.buttonTextColor
             }
 
-            //DARK / LIGHT
             Rectangle {
                 id: themeToggle
                 width: 52
                 height: 28
                 radius: height / 2
-                // inne tło w dark / light
                 color: isDarkTheme ? "#111827" : "#e5e7eb"
                 border.color: isDarkTheme ? "#4b5563" : "#d1d5db"
                 border.width: 1
@@ -452,10 +310,6 @@ ApplicationWindow {
                 }
             }
 
-
-
-
-
             Button {
                 icon.name: "help-about"
                 text: ""
@@ -471,7 +325,6 @@ ApplicationWindow {
         anchors.topMargin: header.height + 16
         spacing: 16
 
-        // LEWY PANEL – pliki i moduły
         Frame {
             Layout.preferredWidth: 260
             Layout.fillHeight: true
@@ -529,7 +382,8 @@ ApplicationWindow {
                         highlighted: ekgController.loadedFilename === modelData
                         
                         onClicked: {
-                            ekgController.loadFileByName(modelData)
+                            pendingFileName = modelData
+                            loadConfirmDialog.open()
                         }
                     }
                     
@@ -555,34 +409,23 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     model: [
                         "ECG BASELINE",
-                        "R PEAKS",
-                        "WAVES",
-                        "HRV1",
-                        "HRV2",
-                        "HRV DFA",
-                        "HEART CLASS"
+                        "R PEAKS"
                     ]
                     onCurrentTextChanged: window.currentModule = currentText
 
-                    //poprawka dla comboboxa zeby czcionka pozostawala odpowiednia dla danego motywu
                     Material.foreground: window.isDarkTheme ? "#f9fafb" : "#111827"
-
 
                     delegate: ItemDelegate {
                         width: ListView.view.width
                         text: modelData
                         font: moduleCombo.font
 
-
                         Material.foreground: window.isDarkTheme ? "#f9fafb" : "#111827"
                     }
                 }
-
-
             }
         }
 
-        // ŚRODKOWY PANEL – wizualizacja
         Frame {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -619,50 +462,19 @@ ApplicationWindow {
                                 id: channelCombo
                                 model: channelOptions
                                 Layout.preferredWidth: 150
-                                enabled: model.length > 0
+                                enabled: model.length > 0 && !chartLoading
                                 currentIndex: selectedChannelIndex
                                 onActivated: {
                                     selectedChannelIndex = currentIndex
+                                    chartLoading = true
                                     scheduleVisualizationRefresh()
                                 }
-                            }
-
-                            Button {
-                                text: "Odśwież"
-                                onClicked: refreshVisualization()
                             }
 
                             Button {
                                 text: "Eksportuj PNG"
                                 enabled: ekgController.hasData
                                 onClicked: exportDialog.open()
-                            }
-                        }
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 12
-                            visible: window.currentModule === "R PEAKS"
-
-                            Label {
-                                text: "Piki R: " + chartRPeaksSeries.length
-                                color: textSecondary
-                            }
-
-                            Label {
-                                text: {
-                                    var bpm = heartRateEstimate()
-                                    return "HR (bpm): " + (bpm > 0 ? Math.round(bpm) : "-")
-                                }
-                                color: textSecondary
-                            }
-
-                            Label {
-                                text: {
-                                    var dur = chartDurationSec()
-                                    return "Czas okna: " + (dur > 0 ? dur.toFixed(1) + " s" : "-")
-                                }
-                                color: textSecondary
                             }
                         }
 
@@ -734,129 +546,15 @@ ApplicationWindow {
 
                             Rectangle {
                                 anchors.fill: parent
-                                color: "transparent"
+                                color: isDarkTheme ? Qt.rgba(0, 0, 0, 0.5) : Qt.rgba(1, 1, 1, 0.5)
                                 visible: chartLoading
                                 z: 2
 
-                                Rectangle {
-                                    width: parent.width * 0.4
-                                    height: 8
-                                    radius: 4
-                                    color: borderColor
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-
-                                    Rectangle {
-                                        id: loadingBarFill
-                                        height: parent.height
-                                        radius: parent.radius
-                                        width: parent.width * 0.2
-                                        color: Material.color(Material.Teal)
-                                        SequentialAnimation on x {
-                                            loops: Animation.Infinite
-                                            NumberAnimation { from: 0; to: parent.width - loadingBarFill.width; duration: 700; easing.type: Easing.InOutQuad }
-                                            NumberAnimation { from: parent.width - loadingBarFill.width; to: 0; duration: 700; easing.type: Easing.InOutQuad }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // HRV TIME (HRV1)
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            visible: window.currentModule === "HRV1"
-                            spacing: 8
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                Label { text: "RR mean: " + (hrvTimeMetrics.rr_mean !== undefined ? hrvTimeMetrics.rr_mean.toFixed(1) + " ms" : "-"); color: textSecondary }
-                                Label { text: "SDNN: " + (hrvTimeMetrics.sdnn !== undefined ? hrvTimeMetrics.sdnn.toFixed(1) + " ms" : "-"); color: textSecondary }
-                                Label { text: "RMSSD: " + (hrvTimeMetrics.rmssd !== undefined ? hrvTimeMetrics.rmssd.toFixed(1) + " ms" : "-"); color: textSecondary }
-                                Label { text: "LF/HF: " + (hrvTimeMetrics.lf_hf !== undefined ? hrvTimeMetrics.lf_hf.toFixed(2) : "-"); color: textSecondary }
-                            }
-
-                            ChartView {
-                                id: hrvTimeChart
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 220
-                                antialiasing: true
-                                backgroundColor: vizBg
-                                legend.visible: false
-
-                                ValueAxis { id: hrvTimeAxisY; labelsColor: textSecondary; min: 0 }
-                                BarCategoryAxis {
-                                    id: hrvTimeAxisX
-                                    labelsColor: textSecondary
-                                    categories: ["VLF", "LF", "HF"]
-                                }
-
-                                BarSeries {
-                                    id: hrvPowerSeries
-                                    axisX: hrvTimeAxisX
-                                    axisY: hrvTimeAxisY
-                                    BarSet {
-                                        id: hrvPowerBarSet
-                                        label: "Moc"
-                                        values: [0, 0, 0]
-                                    }
-                                }
-                            }
-                        }
-
-                        // HRV GEO (HRV2)
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            visible: window.currentModule === "HRV2"
-                            spacing: 8
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                Label { text: "SD1: " + (hrvGeoMetrics.sd1 !== undefined ? hrvGeoMetrics.sd1.toFixed(1) : "-"); color: textSecondary }
-                                Label { text: "SD2: " + (hrvGeoMetrics.sd2 !== undefined ? hrvGeoMetrics.sd2.toFixed(1) : "-"); color: textSecondary }
-                                Label { text: "Triangular index: " + (hrvGeoMetrics.triangular_index !== undefined ? hrvGeoMetrics.triangular_index.toFixed(2) : "-"); color: textSecondary }
-                                Label { text: "TiNN: " + (hrvGeoMetrics.tinn !== undefined ? hrvGeoMetrics.tinn.toFixed(2) : "-"); color: textSecondary }
-                            }
-
-                            ChartView {
-                                id: hrvHistogramChart
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 200
-                                antialiasing: true
-                                backgroundColor: vizBg
-                                legend.visible: false
-
-                                ValueAxis { id: hrvHistAxisX; titleText: "RR bin"; labelsColor: textSecondary }
-                                ValueAxis { id: hrvHistAxisY; titleText: "Count"; labelsColor: textSecondary; min: 0 }
-
-                                LineSeries {
-                                    id: hrvHistogramSeries
-                                    axisX: hrvHistAxisX
-                                    axisY: hrvHistAxisY
-                                    color: "#8b5cf6"
-                                }
-                            }
-
-                            ChartView {
-                                id: hrvPoincareChart
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 220
-                                antialiasing: true
-                                backgroundColor: vizBg
-                                legend.visible: false
-
-                                ValueAxis { id: poincareAxisX; titleText: "RR(n) [ms]"; labelsColor: textSecondary }
-                                ValueAxis { id: poincareAxisY; titleText: "RR(n+1) [ms]"; labelsColor: textSecondary }
-
-                                ScatterSeries {
-                                    id: hrvPoincareSeries
-                                    axisX: poincareAxisX
-                                    axisY: poincareAxisY
-                                    markerShape: ScatterSeries.MarkerShapeCircle
-                                    markerSize: 6
-                                    color: "#f97316"
+                                BusyIndicator {
+                                    anchors.centerIn: parent
+                                    running: chartLoading
+                                    width: 64
+                                    height: 64
                                 }
                             }
                         }
@@ -882,7 +580,6 @@ ApplicationWindow {
             }
         }
 
-        // PRAWY PANEL – parametry analizy
         Frame {
             Layout.preferredWidth: 380
             Layout.maximumWidth: 420
@@ -895,31 +592,23 @@ ApplicationWindow {
                 spacing: 10
 
                 Label {
-                    text: "Panel analizy"
+                    text: window.currentModule
                     font.bold: true
-                    font.pixelSize: 16
-                }
-
-                Label {
-                    text: "Aktywny moduł: " + window.currentModule
-                    color: textSecondary
-                    wrapMode: Text.WordWrap
+                    font.pixelSize: 18
                 }
 
                 Label {
                     visible: !ekgController.hasData && window.currentModule === "ECG BASELINE"
-                    text: "⚠️ Najpierw zaimportuj sygnał EKG"
+                    text: "⚠️ Najpierw zaimportuj sygnal EKG"
                     color: Material.color(Material.Orange)
-                    font.bold: true
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
                 }
 
                 Label {
                     visible: !ekgController.hasFilteredData && window.currentModule === "R PEAKS"
-                    text: "⚠️ Najpierw uruchom filtrowanie baseline (moduł ECG BASELINE)"
+                    text: "⚠️ Najpierw uruchom filtrowanie baseline"
                     color: Material.color(Material.Orange)
-                    font.bold: true
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
                 }
@@ -940,7 +629,6 @@ ApplicationWindow {
                     Label {
                         id: analysisStatus
                         property bool isProcessing: false
-                        property string processingText: ""
                         property string statusText: {
                             var module = window.currentModule
                             var hasData = ekgController.hasData
@@ -948,31 +636,41 @@ ApplicationWindow {
                             var baselineOK = ekgController.baselineCompleted
                             var rPeaksOK = ekgController.rPeaksCompleted
                             
-                            console.log("Status update - module:", module, "hasData:", hasData, "baselineCompleted:", baselineOK, "rPeaksCompleted:", rPeaksOK)
-                            
                             if (module === "ECG BASELINE") {
                                 if (!hasData) {
                                     return "Oczekiwanie na plik"
+                                } else if (isProcessing) {
+                                    return "Przetwarzanie..."
                                 } else if (!baselineOK) {
                                     return "Gotowy"
                                 } else {
-                                    return "Skończono"
+                                    if (lastUsedFilter !== "") {
+                                        return "Przefiltrowano z uzyciem " + lastUsedFilter
+                                    } else {
+                                        return "Skonczono"
+                                    }
                                 }
                             } else if (module === "R PEAKS") {
                                 if (!hasData) {
                                     return "Oczekiwanie na plik"
                                 } else if (!hasFiltered) {
                                     return "Oczekiwanie na filtrowanie"
+                                } else if (isProcessing) {
+                                    return "Przetwarzanie..."
                                 } else if (!rPeaksOK) {
                                     return "Gotowy"
                                 } else {
-                                    return "Skończono"
+                                    if (lastUsedRPeaksMethod !== "") {
+                                        return "Wykryto piki R metoda " + lastUsedRPeaksMethod
+                                    } else {
+                                        return "Skonczono"
+                                    }
                                 }
                             } else {
-                                return hasData ? "Oczekiwanie na analizę" : "Oczekiwanie na import"
+                                return hasData ? "Oczekiwanie na analize" : "Oczekiwanie na import"
                             }
                         }
-                        text: isProcessing ? processingText : statusText
+                        text: statusText
                         property color statusColor: {
                             var module = window.currentModule
                             var hasData = ekgController.hasData
@@ -982,11 +680,13 @@ ApplicationWindow {
                             
                             if (module === "ECG BASELINE") {
                                 if (!hasData) return textSecondary
+                                if (isProcessing) return Material.color(Material.Orange)
                                 if (!baselineOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "R PEAKS") {
                                 if (!hasData) return textSecondary
                                 if (!hasFiltered) return textSecondary
+                                if (isProcessing) return Material.color(Material.Orange)
                                 if (!rPeaksOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             }
@@ -1026,8 +726,6 @@ ApplicationWindow {
                                 return params && params.isReady && params.isReady()
                             } else if (window.currentModule === "R PEAKS") {
                                 return params && params.isReady && params.isReady()
-                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
-                                return ekgController.rPeaksCompleted
                             }
                             return true
                         }
@@ -1043,8 +741,6 @@ ApplicationWindow {
                                 return "Najpierw uruchom filtrowanie baseline"
                             } else if (window.currentModule === "R PEAKS" && (!params || !params.isReady || !params.isReady())) {
                                 return "Wybierz metodę detekcji R"
-                            } else if ((window.currentModule === "HRV1" || window.currentModule === "HRV2") && !ekgController.rPeaksCompleted) {
-                                return "Najpierw wykonaj detekcję pików R"
                             }
                             return ""
                         }
@@ -1059,24 +755,6 @@ ApplicationWindow {
                                 if (paramsLoader.item && paramsLoader.item.runDetection) {
                                     paramsLoader.item.runDetection()
                                 }
-                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
-                                if (!ekgController.rPeaksCompleted) {
-                                    showTemporaryStatus("⚠ Wykonaj najpierw detekcję R", Material.Orange)
-                                    return
-                                }
-                                analysisStatus.isProcessing = true
-                                analysisStatus.processingText = "Obliczam HRV..."
-                                analysisProgress.value = 0
-                                refreshHrvCharts()
-                                analysisStatus.isProcessing = false
-                                analysisStatus.text = "HRV gotowe"
-                                analysisStatus.color = Material.color(Material.Green)
-                                analysisProgress.value = 100
-                            } else {
-                                analysisStatus.text = "Analiza w toku (demo)..."
-                                analysisStatus.color = textSecondary
-                                analysisProgress.value = 0
-                                fakeProgress.restart()
                             }
                         }
                     }
@@ -1086,45 +764,26 @@ ApplicationWindow {
                         Layout.preferredWidth: 100
                         onClicked: {
                             analysisStatus.isProcessing = false
-                            fakeProgress.stop()
                             statusResetTimer.stop()
                             analysisProgress.value = 0
                             if (window.currentModule === "ECG BASELINE") {
                                 ekgController.resetBaseline()
+                                lastUsedFilter = ""
+                                lastUsedRPeaksMethod = ""
                                 chartRawSeries = ekgController.getRawSeries(selectedChannelIndex, maxPlottedPoints)
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
-                                hrvTimeMetrics = ({})
-                                hrvGeoMetrics = ({})
-                                hrvGeoHistogram = []
-                                hrvPoincarePoints = []
                                 applySeriesToChart()
-                                applyHrvCharts()
                             } else if (window.currentModule === "R PEAKS") {
                                 ekgController.resetRPeaks()
+                                lastUsedRPeaksMethod = ""
                                 chartRPeaksSeries = []
-                                hrvTimeMetrics = ({})
-                                hrvGeoMetrics = ({})
-                                hrvGeoHistogram = []
-                                hrvPoincarePoints = []
                                 applySeriesToChart()
-                                applyHrvCharts()
-                            } else if (window.currentModule === "HRV1" || window.currentModule === "HRV2") {
-                                hrvTimeMetrics = ({})
-                                hrvGeoMetrics = ({})
-                                hrvGeoHistogram = []
-                                hrvPoincarePoints = []
-                                applyHrvCharts()
                             } else {
                                 chartRawSeries = []
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
-                                hrvTimeMetrics = ({})
-                                hrvGeoMetrics = ({})
-                                hrvGeoHistogram = []
-                                hrvPoincarePoints = []
                                 applySeriesToChart()
-                                applyHrvCharts()
                             }
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
@@ -1137,44 +796,20 @@ ApplicationWindow {
         }
     }
 
-    //Timer – demo postępu analizy
-    Timer {
-        id: fakeProgress
-        interval: 60
-        repeat: true
-        running: false
-        onTriggered: {
-            if (analysisProgress.value < 100) {
-                analysisProgress.value += 5
-            } else {
-                stop()
-                analysisStatus.text = "✓ Analiza zakończona (demo)"
-                analysisStatus.color = Material.color(Material.Green)
-            }
-        }
-    }
-
-    //ECG BASELINE – parametry filtru
     Component {
         id: baselineParams
 
-        Rectangle {
+        ColumnLayout {
             id: baselineRoot
             Layout.fillWidth: true
-            radius: 10
-            color: panelColor
-            border.color: borderColor
-            border.width: 1
-            clip: true
-            implicitHeight: baselineColumn.implicitHeight + 20
+            spacing: 8
+
             function isReady() {
                 return ekgController.hasData && filterGroup.checkedButton !== null
             }
 
             function resetState() {
                 filterGroup.checkedButton = null
-                polyDegreeSpin.value = 3
-                showOnlyFiltered.checked = false
             }
 
             function runFiltering() {
@@ -1184,9 +819,8 @@ ApplicationWindow {
                 }
 
                 analysisStatus.isProcessing = true
-                analysisStatus.processingText = "Filtrowanie w toku..."
+                chartLoading = true
                 analysisProgress.value = 0
-                fakeProgress.restart()
 
                 if (rbMovingAverage.checked) {
                     ekgController.runBaseline(0)
@@ -1197,94 +831,44 @@ ApplicationWindow {
                 }
             }
 
-            ColumnLayout {
-                id: baselineColumn
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 8
+            Label {
+                text: "Wybierz filtr:"
+                color: textSecondary
+                font.pixelSize: 13
+            }
 
-                Label {
-                    text: "ECG BASELINE – ustawienia filtru"
-                    font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
+            ButtonGroup {
+                id: filterGroup
+            }
 
-                Label {
-                    text: "Wybierz maksymalnie dwa filtry do porównania:"
-                    color: textSecondary
-                    wrapMode: Text.WordWrap
-                    font.pixelSize: 12
-                    Layout.fillWidth: true
-                }
+            RadioButton {
+                id: rbMovingAverage
+                text: "Moving Average"
+                ButtonGroup.group: filterGroup
+            }
 
-                ButtonGroup {
-                    id: filterGroup
-                }
+            RadioButton {
+                id: rbButterworth
+                text: "Butterworth"
+                ButtonGroup.group: filterGroup
+            }
 
-                RadioButton {
-                    id: rbMovingAverage
-                    text: "Moving Average"
-                    ButtonGroup.group: filterGroup
-                }
-
-                RadioButton {
-                    id: rbButterworth
-                    text: "Butterworth"
-                    ButtonGroup.group: filterGroup
-                }
-
-                RadioButton {
-                    id: rbSavitzky
-                    text: "Savitzky-Golay"
-                    ButtonGroup.group: filterGroup
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: borderColor
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    Label {
-                        text: "Stopień wielomianu:"
-                        Layout.preferredWidth: 120
-                    }
-
-                    SpinBox {
-                        id: polyDegreeSpin
-                        from: 1
-                        to: 10
-                        value: 3
-                        Layout.fillWidth: true
-                    }
-                }
-
-                CheckBox {
-                    id: showOnlyFiltered
-                    text: "Pokaż tylko przefiltrowany sygnał"
-                }
+            RadioButton {
+                id: rbSavitzky
+                text: "Savitzky-Golay"
+                ButtonGroup.group: filterGroup
             }
         }
     }
 
-    //R PEAKS – wybór metod detekcji
     Component {
         id: rPeaksParams
 
-        Rectangle {
+        ColumnLayout {
             id: rPeaksRoot
             Layout.fillWidth: true
-            radius: 10
-            color: panelColor
-            border.color: borderColor
-            border.width: 1
-            clip: true
-            implicitHeight: rPeaksColumn.implicitHeight + 20
+            spacing: 8
+
             function isReady() {
                 return ekgController.hasFilteredData && detectionMethodGroup.checkedButton !== null
             }
@@ -1295,14 +879,13 @@ ApplicationWindow {
 
             function runDetection() {
                 if (!detectionMethodGroup.checkedButton) {
-                    showTemporaryStatus("⚠ Wybierz metodę detekcji", Material.Orange)
+                    showTemporaryStatus("⚠ Wybierz metode detekcji", Material.Orange)
                     return
                 }
 
                 analysisStatus.isProcessing = true
-                analysisStatus.processingText = "Detekcja pików R w toku..."
+                chartLoading = true
                 analysisProgress.value = 0
-                fakeProgress.restart()
 
                 if (rbPanTompkins.checked) {
                     ekgController.runRPeaksDetection(0)
@@ -1313,56 +896,39 @@ ApplicationWindow {
                 }
             }
 
-            ColumnLayout {
-                id: rPeaksColumn
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 8
+            Label {
+                text: "Wybierz metode detekcji:"
+                color: textSecondary
+                font.pixelSize: 13
+            }
 
-                Label {
-                    text: "R PEAKS – metoda detekcji"
-                    font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
+            ButtonGroup {
+                id: detectionMethodGroup
+            }
 
-                Label {
-                    text: "Wybierz metodę detekcji pików R:"
-                    color: textSecondary
-                    wrapMode: Text.WordWrap
-                    font.pixelSize: 12
-                    Layout.fillWidth: true
-                }
+            RadioButton {
+                id: rbPanTompkins
+                text: "Pan-Tompkins"
+                ButtonGroup.group: detectionMethodGroup
+            }
 
-                ButtonGroup {
-                    id: detectionMethodGroup
-                }
+            RadioButton {
+                id: rbHilbert
+                text: "Transformata Hilberta"
+                ButtonGroup.group: detectionMethodGroup
+            }
 
-                RadioButton {
-                    id: rbPanTompkins
-                    text: "Pan-Tompkins"
-                    ButtonGroup.group: detectionMethodGroup
-                }
-
-                RadioButton {
-                    id: rbHilbert
-                    text: "Transformata Hilberta"
-                    ButtonGroup.group: detectionMethodGroup
-                }
-
-                RadioButton {
-                    id: rbWavelet
-                    text: "Falkowa (Wavelet)"
-                    ButtonGroup.group: detectionMethodGroup
-                }
+            RadioButton {
+                id: rbWavelet
+                text: "Falkowa (Wavelet)"
+                ButtonGroup.group: detectionMethodGroup
             }
         }
     }
 
-    //OKNO POMOCY
     Dialog {
         id: helpDialog
-        title: "Jak korzystać z EKG Analyzer"
+        title: "Jak korzystac z EKG Analyzer"
         modal: true
         standardButtons: Dialog.Ok
         implicitWidth: 420
@@ -1379,14 +945,47 @@ ApplicationWindow {
 
             Label {
                 leftPadding: 8
-                text: "1. Wybierz plik EKG (Import sygnału).\n" +
-                      "2. Wybierz moduł analizy (np. ECG BASELINE, R PEAKS).\n" +
+                text: "1. Wybierz plik EKG (Import sygnalu).\n" +
+                      "2. Wybierz modul analizy (ECG BASELINE lub R PEAKS).\n" +
                       "3. Ustaw parametry w prawym panelu.\n" +
-                      "4. Kliknij „Uruchom analizę”, aby przetworzyć sygnał.\n\n"
+                      "4. Kliknij 'Uruchom analize', aby przetworzyc sygnal.\n\n"
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
         }
     }
 
+    Dialog {
+        id: loadConfirmDialog
+        title: "Potwierdzenie"
+        modal: true
+        standardButtons: Dialog.Yes | Dialog.No
+        implicitWidth: 400
+
+        onVisibleChanged: if (visible) {
+            x = (window.width  - implicitWidth)  / 2
+            y = (window.height - implicitHeight) / 2
+        }
+
+        onAccepted: {
+            ekgController.loadFileByName(pendingFileName)
+            pendingFileName = ""
+        }
+
+        onRejected: {
+            pendingFileName = ""
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 8
+
+            Label {
+                text: "Czy na pewno chcesz zaladowac plik " + pendingFileName + "?"
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+        }
+    }
 }
