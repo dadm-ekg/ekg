@@ -25,11 +25,13 @@ void EkgController::loadData(const QString &filename) {
     if (success) {
         baseline_completed_ = false;
         r_peaks_completed_ = false;
+        hrv_time_completed_ = false;
         emit loadedFilenameChanged();
         emit isFileLoadedChanged();
         emit hasDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
+        emit hrvTimeCompletedChanged();
         emit fileLoadSuccess(filename);
     } else {
         emit fileLoadError("Nie udało się załadować pliku");
@@ -86,9 +88,11 @@ bool EkgController::runBaseline(int filterMethod) {
     if (success) {
         baseline_completed_ = true;
         r_peaks_completed_ = false;
+        hrv_time_completed_ = false;
         emit hasFilteredDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
+        emit hrvTimeCompletedChanged();
         emit filteringSuccess(filterName);
     } else {
         emit filteringError("Nie udało się zastosować filtra " + filterName);
@@ -128,13 +132,50 @@ bool EkgController::runRPeaksDetection(int method) {
 
     if (success) {
         r_peaks_completed_ = true;
+        hrv_time_completed_ = false;
         emit rPeaksCompletedChanged();
+        emit hrvTimeCompletedChanged();
         emit rPeaksDetectionSuccess(methodName);
     } else {
         emit rPeaksDetectionError("Nie udało się wykryć pików R metodą " + methodName);
     }
 
     return success;
+}
+
+bool EkgController::runHRVTime(int method) {
+    if (!rPeaksCompleted()) {
+        emit hrvTimeError("Brak wykrytych pików R. Najpierw uruchom detekcję pików R.");
+        return false;
+    }
+
+    QString methodName;
+    HRVTimeMetrics::SpectralMethod spectralMethod;
+
+    switch (method) {
+        case HRVSpectralMethod::ClassicPeriodogram:
+            methodName = "Klasyczny periodogram";
+            spectralMethod = HRVTimeMetrics::SpectralMethod::CLASSIC_PERIODOGRAM;
+            break;
+        case HRVSpectralMethod::LombScargle:
+            methodName = "Lomb-Scargle";
+            spectralMethod = HRVTimeMetrics::SpectralMethod::LOMB_SCARGLE;
+            break;
+        case HRVSpectralMethod::Welch:
+            methodName = "Welch";
+            spectralMethod = HRVTimeMetrics::SpectralMethod::WELCH;
+            break;
+        default:
+            emit hrvTimeError("Nieznana metoda estymacji widma");
+            return false;
+    }
+
+    cached_hrv_metrics_ = application_service_->CalculateHRVTime(spectralMethod);
+    hrv_time_completed_ = true;
+    emit hrvTimeCompletedChanged();
+    emit hrvTimeSuccess(methodName);
+
+    return true;
 }
 
 QString EkgController::loadedFilename() const {
@@ -159,6 +200,16 @@ bool EkgController::baselineCompleted() const {
 
 bool EkgController::rPeaksCompleted() const {
     return r_peaks_completed_;
+}
+
+bool EkgController::hrvTimeCompleted() const {
+    return hrv_time_completed_;
+}
+
+void EkgController::resetHRVTime() {
+    hrv_time_completed_ = false;
+    cached_hrv_metrics_ = HRVTimeMetrics{};
+    emit hrvTimeCompletedChanged();
 }
 
 QStringList EkgController::getAvailableFiles() const {
@@ -208,15 +259,19 @@ void EkgController::resetBaseline() {
     application_service_->ClearFilteredData();
     baseline_completed_ = false;
     r_peaks_completed_ = false;
+    hrv_time_completed_ = false;
     emit hasFilteredDataChanged();
     emit baselineCompletedChanged();
     emit rPeaksCompletedChanged();
+    emit hrvTimeCompletedChanged();
 }
 
 void EkgController::resetRPeaks() {
     application_service_->ClearRPeaks();
     r_peaks_completed_ = false;
+    hrv_time_completed_ = false;
     emit rPeaksCompletedChanged();
+    emit hrvTimeCompletedChanged();
 }
 
 namespace {
@@ -286,6 +341,19 @@ QVariantList EkgController::getRPeakMarkers(int channel) const {
     }
 
     return markers;
+}
+
+QVariantMap EkgController::getHRVTimeMetrics() const {
+    QVariantMap metrics;
+    metrics["rr_mean"] = static_cast<double>(cached_hrv_metrics_.rr_mean);
+    metrics["sdnn"] = static_cast<double>(cached_hrv_metrics_.sdnn);
+    metrics["rmssd"] = static_cast<double>(cached_hrv_metrics_.rmssd);
+    metrics["tp"] = static_cast<double>(cached_hrv_metrics_.tp);
+    metrics["vlf"] = static_cast<double>(cached_hrv_metrics_.vlf);
+    metrics["lf"] = static_cast<double>(cached_hrv_metrics_.lf);
+    metrics["hf"] = static_cast<double>(cached_hrv_metrics_.hf);
+    metrics["lf_hf"] = static_cast<double>(cached_hrv_metrics_.lf_hf);
+    return metrics;
 }
 
 int EkgController::channelCount() const {

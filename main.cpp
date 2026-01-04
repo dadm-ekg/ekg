@@ -9,6 +9,7 @@
 #include "include/service/butterworth_filter_service.h"
 #include "include/service/moving_average_filter_service.h"
 #include "include/service/r_peaks_detection_service.h"
+#include "include/service/hrv_time_processing_service.h"
 
 int main(int argc, char *argv[])
 {
@@ -18,12 +19,14 @@ int main(int argc, char *argv[])
     auto butterworth_filter_service = std::make_shared<ButterworthFilterService>();
     auto moving_average_filter_service = std::make_shared<MovingAverageFilterService>();
     auto r_peaks_detection_service = std::make_shared<RPeaksDetectionService>();
+    auto hrv_time_processing_service = std::make_shared<HRVTimeProcessingService>();
 
     auto application_service = std::make_shared<ApplicationService>(
         signal_repository,
         butterworth_filter_service,
         moving_average_filter_service,
-        r_peaks_detection_service
+        r_peaks_detection_service,
+        hrv_time_processing_service
     );
 
     auto ekg_controller = new EkgController(application_service);

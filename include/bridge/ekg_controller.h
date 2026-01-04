@@ -16,6 +16,7 @@ class EkgController : public QObject {
     Q_PROPERTY(bool hasFilteredData READ hasFilteredData NOTIFY hasFilteredDataChanged)
     Q_PROPERTY(bool baselineCompleted READ baselineCompleted NOTIFY baselineCompletedChanged)
     Q_PROPERTY(bool rPeaksCompleted READ rPeaksCompleted NOTIFY rPeaksCompletedChanged)
+    Q_PROPERTY(bool hrvTimeCompleted READ hrvTimeCompleted NOTIFY hrvTimeCompletedChanged)
 
 public:
     enum FilterMethod {
@@ -32,19 +33,29 @@ public:
     };
     Q_ENUM(RPeaksMethod)
 
+    enum HRVSpectralMethod {
+        ClassicPeriodogram = 0,
+        LombScargle = 1,
+        Welch = 2
+    };
+    Q_ENUM(HRVSpectralMethod)
+
     explicit EkgController(std::shared_ptr<IApplicationService> application_service, QObject *parent = nullptr);
 
     Q_INVOKABLE void loadData(const QString &filename);
     Q_INVOKABLE void openFileDialog();
     Q_INVOKABLE bool runBaseline(int filterMethod);
     Q_INVOKABLE bool runRPeaksDetection(int method);
+    Q_INVOKABLE bool runHRVTime(int method);
     Q_INVOKABLE QStringList getAvailableFiles() const;
     Q_INVOKABLE void loadFileByName(const QString &filename);
     Q_INVOKABLE void resetBaseline();
     Q_INVOKABLE void resetRPeaks();
+    Q_INVOKABLE void resetHRVTime();
     Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
+    Q_INVOKABLE QVariantMap getHRVTimeMetrics() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
 
@@ -54,6 +65,7 @@ public:
     bool hasFilteredData() const;
     bool baselineCompleted() const;
     bool rPeaksCompleted() const;
+    bool hrvTimeCompleted() const;
 
 signals:
     void loadedFilenameChanged();
@@ -62,17 +74,22 @@ signals:
     void hasFilteredDataChanged();
     void baselineCompletedChanged();
     void rPeaksCompletedChanged();
+    void hrvTimeCompletedChanged();
     void fileLoadSuccess(const QString &filename);
     void fileLoadError(const QString &errorMessage);
     void filteringSuccess(const QString &filterName);
     void filteringError(const QString &errorMessage);
     void rPeaksDetectionSuccess(const QString &methodName);
     void rPeaksDetectionError(const QString &errorMessage);
+    void hrvTimeSuccess(const QString &methodName);
+    void hrvTimeError(const QString &errorMessage);
 
 private:
     std::shared_ptr<IApplicationService> application_service_;
     bool baseline_completed_ = false;
     bool r_peaks_completed_ = false;
+    bool hrv_time_completed_ = false;
+    HRVTimeMetrics cached_hrv_metrics_;
 };
 
 #endif

@@ -10,12 +10,14 @@ ApplicationService::ApplicationService(
     std::shared_ptr<ISignalRepository> signal_repository,
     std::shared_ptr<IFilterService> butterworth_filter_service,
     std::shared_ptr<IFilterService> moving_average_filter_service,
-    std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service
+    std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
+    std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service
 )
     : signal_repository_(std::move(signal_repository)),
       butterworth_filter_service_(std::move(butterworth_filter_service)),
       moving_average_filter_service_(std::move(moving_average_filter_service)),
-      r_peaks_detection_service_(std::move(r_peaks_detection_service)) {
+      r_peaks_detection_service_(std::move(r_peaks_detection_service)),
+      hrv_time_processing_service_(std::move(hrv_time_processing_service)) {
 }
 
 bool ApplicationService::Load(const QString &filename) {
@@ -84,4 +86,16 @@ bool ApplicationService::CalculateRPeaks(RPeaksDetectionMethod method) const {
     this->r_peaks = std::make_shared<std::vector<RPeaksAnnotatedSignalDatapoint>>(detected_peaks);
     
     return true;
+}
+
+HRVTimeMetrics ApplicationService::CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const {
+    if (filtered_dataset == nullptr || r_peaks == nullptr) {
+        return HRVTimeMetrics{};
+    }
+    return hrv_time_processing_service_->Process(
+        filtered_dataset->values, 
+        *r_peaks, 
+        filtered_dataset->frequency, 
+        method
+    );
 }
