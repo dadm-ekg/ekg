@@ -125,32 +125,17 @@ ApplicationWindow {
         updateSeries(rawSeriesLine, chartRawSeries)
         updateSeries(filteredSeriesLine, chartFilteredSeries)
         
-        if (window.currentModule === "R PEAKS") {
-            updateSeries(peaksSeries, chartRPeaksSeries)
-            peaksSeries.visible = chartRPeaksSeries.length > 0
-        } else {
-            peaksSeries.clear()
-            peaksSeries.visible = false
-        }
+        updateSeries(peaksSeries, chartRPeaksSeries)
         
-        if (window.currentModule === "WAVES") {
+        if (chartWaveMarkers) {
             updateSeries(pOnsetSeries, chartWaveMarkers.p_onsets || [])
             updateSeries(pEndSeries, chartWaveMarkers.p_ends || [])
             updateSeries(qrsOnsetSeries, chartWaveMarkers.qrs_onsets || [])
             updateSeries(qrsEndSeries, chartWaveMarkers.qrs_ends || [])
             updateSeries(tEndSeries, chartWaveMarkers.t_ends || [])
-        } else {
-            pOnsetSeries.clear()
-            pEndSeries.clear()
-            qrsOnsetSeries.clear()
-            qrsEndSeries.clear()
-            tEndSeries.clear()
-            pOnsetSeries.visible = false
-            pEndSeries.visible = false
-            qrsOnsetSeries.visible = false
-            qrsEndSeries.visible = false
-            tEndSeries.visible = false
         }
+        
+        updateMarkerVisibility()
         
         rescaleChart()
         chartLoading = false
@@ -196,7 +181,18 @@ ApplicationWindow {
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
         analysisProgress.value = 0
-        Qt.callLater(applySeriesToChart)
+        updateMarkerVisibility()
+    }
+
+    function updateMarkerVisibility() {
+        peaksSeries.visible = window.currentModule === "R PEAKS" && chartRPeaksSeries.length > 0
+        
+        var showWaves = window.currentModule === "WAVES" && ekgController.wavesCompleted
+        pOnsetSeries.visible = showWaves
+        pEndSeries.visible = showWaves
+        qrsOnsetSeries.visible = showWaves
+        qrsEndSeries.visible = showWaves
+        tEndSeries.visible = showWaves
     }
 
     Connections {
