@@ -13,7 +13,8 @@ ApplicationService::ApplicationService(
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
-    std::shared_ptr<IWavesDetectionService> waves_detection_service
+    std::shared_ptr<IWavesDetectionService> waves_detection_service,
+    std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service
 )
     : signal_repository_(std::move(signal_repository)),
       butterworth_filter_service_(std::move(butterworth_filter_service)),
@@ -21,7 +22,8 @@ ApplicationService::ApplicationService(
       r_peaks_detection_service_(std::move(r_peaks_detection_service)),
       hrv_time_processing_service_(std::move(hrv_time_processing_service)),
       hrv_geo_processing_service_(std::move(hrv_geo_processing_service)),
-      waves_detection_service_(std::move(waves_detection_service)) {
+      waves_detection_service_(std::move(waves_detection_service)),
+      heart_class_detection_service_(std::move(heart_class_detection_service)) {
 }
 
 bool ApplicationService::Load(const QString &filename) {
@@ -29,6 +31,7 @@ bool ApplicationService::Load(const QString &filename) {
     this->filtered_dataset = nullptr;
     this->r_peaks = nullptr;
     this->waves = nullptr;
+    this->heart_class_result_ = HeartClassResult{};
     const QFileInfo fileInfo(filename);
     this->loaded_filename = fileInfo.completeBaseName();
     return true;
@@ -65,6 +68,7 @@ bool ApplicationService::RunFiltering(FilterMethod method) const {
     this->filtered_dataset->frequency = this->loaded_dataset->frequency;
     this->r_peaks = nullptr;
     this->waves = nullptr;
+    this->heart_class_result_ = HeartClassResult{};
     
     if (method == Butterworth) {
         this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values);
@@ -79,6 +83,7 @@ void ApplicationService::ClearFilteredData() const {
     this->filtered_dataset = nullptr;
     this->r_peaks = nullptr;
     this->waves = nullptr;
+    this->heart_class_result_ = HeartClassResult{};
 }
 
 void ApplicationService::ClearRPeaks() const {
@@ -132,4 +137,17 @@ bool ApplicationService::CalculateWaves() const {
     this->waves = std::make_shared<std::vector<WaveAnnotatedSignalDatapoint>>(detected_waves);
     
     return true;
+}
+
+HeartClassResult ApplicationService::CalculateHeartClass() const {
+    if (filtered_dataset == nullptr) {
+        return HeartClassResult{};
+    }
+    
+    heart_class_result_ = heart_class_detection_service_->Detect(
+        filtered_dataset->values,
+        filtered_dataset->frequency
+    );
+    
+    return heart_class_result_;
 }

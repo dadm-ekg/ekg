@@ -7,6 +7,7 @@
 #include "../../dto/r_peaks_detection_method.h"
 #include "../../dto/hrv_time_metrics.h"
 #include "../../dto/hrv_geo_metrics.h"
+#include "../../dto/heart_class_result.h"
 #include "../../model/signal_dataset.h"
 #include "../../model/r_peaks_annotated_signal_datapoint.h"
 #include "../../model/wave_annotated_signal_datapoint.h"
@@ -42,6 +43,8 @@ public:
     virtual HRVGeoMetrics CalculateHRVGeo() const = 0;
 
     virtual bool CalculateWaves() const = 0;
+
+    virtual HeartClassResult CalculateHeartClass() const = 0;
 };
 
 #endif

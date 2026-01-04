@@ -41,10 +41,12 @@ ApplicationWindow {
     property string lastUsedHRVTimeMethod: ""
     property bool hrvGeoRan: false
     property bool wavesRan: false
+    property bool heartClassRan: false
     property int selectedFilterMethod: -1
     property int selectedRPeaksMethod: -1
     property int selectedHRVTimeMethod: -1
     property var chartWaveMarkers: {}
+    property var heartClassAnnotations: []
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -207,7 +209,9 @@ ApplicationWindow {
             selectedHRVTimeMethod = -1
             hrvGeoRan = false
             wavesRan = false
+            heartClassRan = false
             chartWaveMarkers = {}
+            heartClassAnnotations = []
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -300,6 +304,24 @@ ApplicationWindow {
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
                 refreshVisualization()
+            }
+        }
+        function onHeartClassSuccess() {
+            heartClassRan = true
+            heartClassAnnotations = ekgController.getHeartClassAnnotations()
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 100
+        }
+        function onHeartClassError(errorMessage) {
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 0
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+        function onHeartClassCompletedChanged() {
+            if (ekgController.heartClassCompleted) {
+                heartClassAnnotations = ekgController.getHeartClassAnnotations()
+                analysisStatus.isProcessing = false
+                analysisProgress.value = 100
             }
         }
     }
@@ -501,7 +523,8 @@ ApplicationWindow {
                         "R PEAKS",
                         "WAVES",
                         "HRV TIME",
-                        "HRV GEO"
+                        "HRV GEO",
+                        "HEART CLASS"
                     ]
                     onCurrentTextChanged: window.currentModule = currentText
 
@@ -784,6 +807,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Label {
+                    visible: !ekgController.hasFilteredData && window.currentModule === "HEART CLASS"
+                    text: "⚠️ Najpierw uruchom filtrowanie baseline"
+                    color: Material.color(Material.Orange)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -871,6 +902,19 @@ ApplicationWindow {
                                 } else {
                                     return "Wykryto fale EKG"
                                 }
+                            } else if (module === "HEART CLASS") {
+                                var heartClassOK = ekgController.heartClassCompleted
+                                if (!hasData) {
+                                    return "Oczekiwanie na plik"
+                                } else if (!hasFiltered) {
+                                    return "Oczekiwanie na filtrowanie"
+                                } else if (isProcessing) {
+                                    return "Przetwarzanie..."
+                                } else if (!heartClassOK) {
+                                    return "Gotowy"
+                                } else {
+                                    return "Sklasyfikowano uderzenia serca"
+                                }
                             } else {
                                 return hasData ? "Oczekiwanie na analize" : "Oczekiwanie na import"
                             }
@@ -915,6 +959,13 @@ ApplicationWindow {
                                 if (isProcessing) return Material.color(Material.Orange)
                                 if (!wavesOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
+                            } else if (module === "HEART CLASS") {
+                                var heartClassOK = ekgController.heartClassCompleted
+                                if (!hasData) return textSecondary
+                                if (!hasFiltered) return textSecondary
+                                if (isProcessing) return Material.color(Material.Orange)
+                                if (!heartClassOK) return Material.color(Material.Teal)
+                                return Material.color(Material.Green)
                             }
                             return textSecondary
                         }
@@ -945,6 +996,7 @@ ApplicationWindow {
                         window.currentModule === "WAVES"        ? wavesParams :
                         window.currentModule === "HRV TIME"     ? hrvTimeParams :
                         window.currentModule === "HRV GEO"      ? hrvGeoParams :
+                        window.currentModule === "HEART CLASS"  ? heartClassParams :
                         null
                 }
 
@@ -970,6 +1022,8 @@ ApplicationWindow {
                                 return ekgController.rPeaksCompleted
                             } else if (window.currentModule === "WAVES") {
                                 return ekgController.hasFilteredData
+                            } else if (window.currentModule === "HEART CLASS") {
+                                return ekgController.hasFilteredData
                             }
                             return true
                         }
@@ -992,6 +1046,8 @@ ApplicationWindow {
                             } else if (window.currentModule === "HRV GEO" && !ekgController.rPeaksCompleted) {
                                 return "Najpierw uruchom detekcję pików R"
                             } else if (window.currentModule === "WAVES" && !ekgController.hasFilteredData) {
+                                return "Najpierw uruchom filtrowanie baseline"
+                            } else if (window.currentModule === "HEART CLASS" && !ekgController.hasFilteredData) {
                                 return "Najpierw uruchom filtrowanie baseline"
                             }
                             return ""
@@ -1018,6 +1074,10 @@ ApplicationWindow {
                             } else if (window.currentModule === "WAVES") {
                                 if (paramsLoader.item && paramsLoader.item.runWaves) {
                                     paramsLoader.item.runWaves()
+                                }
+                            } else if (window.currentModule === "HEART CLASS") {
+                                if (paramsLoader.item && paramsLoader.item.runHeartClass) {
+                                    paramsLoader.item.runHeartClass()
                                 }
                             }
                         }
@@ -1089,6 +1149,10 @@ ApplicationWindow {
                                 qrsOnsetSeries.visible = false
                                 qrsEndSeries.visible = false
                                 tEndSeries.visible = false
+                            } else if (window.currentModule === "HEART CLASS") {
+                                ekgController.resetHeartClass()
+                                heartClassRan = false
+                                heartClassAnnotations = []
                             } else {
                                 chartRawSeries = []
                                 chartFilteredSeries = []
@@ -1635,6 +1699,140 @@ ApplicationWindow {
         }
     }
 
+    Component {
+        id: heartClassParams
+
+        ColumnLayout {
+            id: heartClassRoot
+            Layout.fillWidth: true
+            spacing: 8
+
+            function isReady() {
+                return ekgController.hasFilteredData
+            }
+
+            function resetState() {
+            }
+
+            function runHeartClass() {
+                analysisStatus.isProcessing = true
+                analysisProgress.value = 0
+                ekgController.runHeartClass()
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: borderColor
+                visible: ekgController.heartClassCompleted
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+            }
+
+            GridLayout {
+                visible: ekgController.heartClassCompleted
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 6
+                Layout.fillWidth: true
+
+                Label {
+                    text: "Statystyki klasyfikacji:"
+                    font.bold: true
+                    font.pixelSize: 14
+                    Layout.columnSpan: 2
+                }
+
+                Label { text: "Liczba uderzen:" }
+                Label {
+                    text: heartClassAnnotations.length
+                    color: Material.color(Material.Teal)
+                }
+            }
+
+            ColumnLayout {
+                visible: ekgController.heartClassCompleted && heartClassAnnotations.length > 0
+                Layout.fillWidth: true
+                spacing: 4
+                Layout.topMargin: 8
+
+                Label {
+                    text: "Legenda:"
+                    font.bold: true
+                    font.pixelSize: 14
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#22c55e" }
+                    Label { text: "N - Normalne"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#ef4444" }
+                    Label { text: "V - Komorowe (PVC)"; font.pixelSize: 12 }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle { width: 12; height: 12; radius: 6; color: "#f59e0b" }
+                    Label { text: "A - Przedsionkowe (PAC)"; font.pixelSize: 12 }
+                }
+            }
+
+            ListView {
+                id: heartClassList
+                visible: ekgController.heartClassCompleted && heartClassAnnotations.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(200, heartClassAnnotations.length * 30)
+                clip: true
+                model: heartClassAnnotations
+
+                delegate: RowLayout {
+                    width: ListView.view.width
+                    spacing: 8
+
+                    Rectangle {
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: {
+                            var label = modelData.label
+                            if (label === "N") return "#22c55e"
+                            if (label === "V") return "#ef4444"
+                            if (label === "A") return "#f59e0b"
+                            return "#9ca3af"
+                        }
+                    }
+
+                    Label {
+                        text: modelData.time.toFixed(2) + "s"
+                        font.pixelSize: 12
+                        Layout.preferredWidth: 60
+                    }
+
+                    Label {
+                        text: modelData.label
+                        font.bold: true
+                        font.pixelSize: 12
+                        color: {
+                            var label = modelData.label
+                            if (label === "N") return "#22c55e"
+                            if (label === "V") return "#ef4444"
+                            if (label === "A") return "#f59e0b"
+                            return textSecondary
+                        }
+                    }
+                }
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                }
+            }
+        }
+    }
+
     Dialog {
         id: helpDialog
         title: "Jak korzystac z EKG Analyzer"
@@ -1655,7 +1853,7 @@ ApplicationWindow {
             Label {
                 leftPadding: 8
                 text: "1. Wybierz plik EKG (Import sygnalu).\n" +
-                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, WAVES, HRV TIME lub HRV GEO).\n" +
+                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, WAVES, HRV TIME, HRV GEO lub HEART CLASS).\n" +
                       "3. Ustaw parametry w prawym panelu.\n" +
                       "4. Kliknij 'Uruchom analize', aby przetworzyc sygnal.\n\n"
                 wrapMode: Text.WordWrap

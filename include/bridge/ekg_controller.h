@@ -19,6 +19,7 @@ class EkgController : public QObject {
     Q_PROPERTY(bool hrvTimeCompleted READ hrvTimeCompleted NOTIFY hrvTimeCompletedChanged)
     Q_PROPERTY(bool hrvGeoCompleted READ hrvGeoCompleted NOTIFY hrvGeoCompletedChanged)
     Q_PROPERTY(bool wavesCompleted READ wavesCompleted NOTIFY wavesCompletedChanged)
+    Q_PROPERTY(bool heartClassCompleted READ heartClassCompleted NOTIFY heartClassCompletedChanged)
 
 public:
     enum FilterMethod {
@@ -51,6 +52,7 @@ public:
     Q_INVOKABLE bool runHRVTime(int method);
     Q_INVOKABLE bool runHRVGeo();
     Q_INVOKABLE bool runWaves();
+    Q_INVOKABLE bool runHeartClass();
     Q_INVOKABLE QStringList getAvailableFiles() const;
     Q_INVOKABLE void loadFileByName(const QString &filename);
     Q_INVOKABLE void resetBaseline();
@@ -58,6 +60,7 @@ public:
     Q_INVOKABLE void resetHRVTime();
     Q_INVOKABLE void resetHRVGeo();
     Q_INVOKABLE void resetWaves();
+    Q_INVOKABLE void resetHeartClass();
     Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
@@ -66,6 +69,7 @@ public:
     Q_INVOKABLE QVariantList getHRVGeoHistogram() const;
     Q_INVOKABLE QVariantList getHRVGeoPoincare() const;
     Q_INVOKABLE QVariantMap getWaveMarkers(int channel = 0) const;
+    Q_INVOKABLE QVariantList getHeartClassAnnotations() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
 
@@ -78,6 +82,7 @@ public:
     bool hrvTimeCompleted() const;
     bool hrvGeoCompleted() const;
     bool wavesCompleted() const;
+    bool heartClassCompleted() const;
 
 signals:
     void loadedFilenameChanged();
@@ -89,6 +94,7 @@ signals:
     void hrvTimeCompletedChanged();
     void hrvGeoCompletedChanged();
     void wavesCompletedChanged();
+    void heartClassCompletedChanged();
     void fileLoadSuccess(const QString &filename);
     void fileLoadError(const QString &errorMessage);
     void filteringSuccess(const QString &filterName);
@@ -101,6 +107,8 @@ signals:
     void hrvGeoError(const QString &errorMessage);
     void wavesSuccess();
     void wavesError(const QString &errorMessage);
+    void heartClassSuccess();
+    void heartClassError(const QString &errorMessage);
 
 private:
     std::shared_ptr<IApplicationService> application_service_;
@@ -109,8 +117,10 @@ private:
     bool hrv_time_completed_ = false;
     bool hrv_geo_completed_ = false;
     bool waves_completed_ = false;
+    bool heart_class_completed_ = false;
     HRVTimeMetrics cached_hrv_metrics_;
     HRVGeoMetrics cached_hrv_geo_metrics_;
+    HeartClassResult cached_heart_class_result_;
 };
 
 #endif

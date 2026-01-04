@@ -12,6 +12,7 @@
 #include "include/service/hrv_time_processing_service.h"
 #include "include/service/hrv_geo_processing_service.h"
 #include "include/service/waves_detection_service.h"
+#include "include/service/heart_class_detection_service.h"
 
 int main(int argc, char *argv[])
 {
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
     auto hrv_time_processing_service = std::make_shared<HRVTimeProcessingService>();
     auto hrv_geo_processing_service = std::make_shared<HRVGeoProcessingService>();
     auto waves_detection_service = std::make_shared<WavesDetectionService>();
+    auto heart_class_detection_service = std::make_shared<HeartClassDetectionService>();
 
     auto application_service = std::make_shared<ApplicationService>(
         signal_repository,
@@ -32,7 +34,8 @@ int main(int argc, char *argv[])
         r_peaks_detection_service,
         hrv_time_processing_service,
         hrv_geo_processing_service,
-        waves_detection_service
+        waves_detection_service,
+        heart_class_detection_service
     );
 
     auto ekg_controller = new EkgController(application_service);

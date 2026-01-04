@@ -28,6 +28,7 @@ void EkgController::loadData(const QString &filename) {
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
         waves_completed_ = false;
+        heart_class_completed_ = false;
         emit loadedFilenameChanged();
         emit isFileLoadedChanged();
         emit hasDataChanged();
@@ -36,6 +37,7 @@ void EkgController::loadData(const QString &filename) {
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
         emit wavesCompletedChanged();
+        emit heartClassCompletedChanged();
         emit fileLoadSuccess(filename);
     } else {
         emit fileLoadError("Nie udało się załadować pliku");
@@ -95,12 +97,14 @@ bool EkgController::runBaseline(int filterMethod) {
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
         waves_completed_ = false;
+        heart_class_completed_ = false;
         emit hasFilteredDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
         emit wavesCompletedChanged();
+        emit heartClassCompletedChanged();
         emit filteringSuccess(filterName);
     } else {
         emit filteringError("Nie udało się zastosować filtra " + filterName);
@@ -143,10 +147,12 @@ bool EkgController::runRPeaksDetection(int method) {
         hrv_time_completed_ = false;
         hrv_geo_completed_ = false;
         waves_completed_ = false;
+        heart_class_completed_ = false;
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
         emit hrvGeoCompletedChanged();
         emit wavesCompletedChanged();
+        emit heartClassCompletedChanged();
         emit rPeaksDetectionSuccess(methodName);
     } else {
         emit rPeaksDetectionError("Nie udało się wykryć pików R metodą " + methodName);
@@ -259,6 +265,10 @@ bool EkgController::wavesCompleted() const {
     return waves_completed_;
 }
 
+bool EkgController::heartClassCompleted() const {
+    return heart_class_completed_;
+}
+
 void EkgController::resetHRVTime() {
     hrv_time_completed_ = false;
     cached_hrv_metrics_ = HRVTimeMetrics{};
@@ -274,6 +284,45 @@ void EkgController::resetHRVGeo() {
 void EkgController::resetWaves() {
     waves_completed_ = false;
     emit wavesCompletedChanged();
+}
+
+void EkgController::resetHeartClass() {
+    heart_class_completed_ = false;
+    cached_heart_class_result_ = HeartClassResult{};
+    emit heartClassCompletedChanged();
+}
+
+bool EkgController::runHeartClass() {
+    if (!hasFilteredData()) {
+        emit heartClassError("Brak przefiltrowanych danych. Najpierw uruchom filtrowanie baseline.");
+        return false;
+    }
+
+    cached_heart_class_result_ = application_service_->CalculateHeartClass();
+    heart_class_completed_ = true;
+    emit heartClassCompletedChanged();
+    emit heartClassSuccess();
+
+    return true;
+}
+
+QVariantList EkgController::getHeartClassAnnotations() const {
+    QVariantList result;
+    
+    const auto filtered = application_service_->GetFilteredData();
+    if (!filtered || filtered->values.empty()) return result;
+    
+    const double frequency = filtered->frequency > 0 ? static_cast<double>(filtered->frequency) : 1.0;
+    
+    for (const auto& [sampleIdx, label] : cached_heart_class_result_.annotations) {
+        QVariantMap entry;
+        entry["sample"] = sampleIdx;
+        entry["time"] = static_cast<double>(sampleIdx) / frequency;
+        entry["label"] = QString::fromStdString(label);
+        result.append(entry);
+    }
+    
+    return result;
 }
 
 QStringList EkgController::getAvailableFiles() const {
@@ -326,12 +375,14 @@ void EkgController::resetBaseline() {
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
     waves_completed_ = false;
+    heart_class_completed_ = false;
     emit hasFilteredDataChanged();
     emit baselineCompletedChanged();
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
     emit wavesCompletedChanged();
+    emit heartClassCompletedChanged();
 }
 
 void EkgController::resetRPeaks() {
@@ -340,10 +391,12 @@ void EkgController::resetRPeaks() {
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
     waves_completed_ = false;
+    heart_class_completed_ = false;
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
     emit wavesCompletedChanged();
+    emit heartClassCompletedChanged();
 }
 
 namespace {
