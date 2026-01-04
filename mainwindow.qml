@@ -47,6 +47,11 @@ ApplicationWindow {
     property int selectedHRVTimeMethod: -1
     property var chartWaveMarkers: {}
     property var heartClassAnnotations: []
+    property real chartTotalDuration: 0
+    property real chartWindowSize: 10.0
+    property real chartScrollPosition: 0.0
+    property real chartMinWindowSize: 1.0
+    property real chartMaxWindowSize: 60.0
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -173,10 +178,49 @@ ApplicationWindow {
             maxY += 0.5
         }
 
-        chartAxisX.min = 0
-        chartAxisX.max = maxX > 0 ? maxX : 1
+        chartTotalDuration = maxX > 0 ? maxX : 1
+        
+        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+        var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
+        var startX = chartScrollPosition * scrollableRange
+        var endX = startX + effectiveWindowSize
+
+        chartAxisX.min = startX
+        chartAxisX.max = endX
         chartAxisY.min = minY
         chartAxisY.max = maxY
+    }
+
+    function scrollChart(delta) {
+        if (chartTotalDuration <= chartWindowSize) return
+        var scrollableRange = chartTotalDuration - chartWindowSize
+        var step = (chartWindowSize * 0.1) / scrollableRange
+        chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition + delta * step))
+        updateChartView()
+    }
+
+    function zoomChart(factor) {
+        var newWindowSize = chartWindowSize * factor
+        newWindowSize = Math.max(chartMinWindowSize, Math.min(chartMaxWindowSize, newWindowSize))
+        newWindowSize = Math.min(newWindowSize, chartTotalDuration)
+        chartWindowSize = newWindowSize
+        chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition))
+        updateChartView()
+    }
+
+    function updateChartView() {
+        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+        var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
+        var startX = chartScrollPosition * scrollableRange
+        var endX = startX + effectiveWindowSize
+        chartAxisX.min = startX
+        chartAxisX.max = endX
+    }
+
+    function resetChartView() {
+        chartScrollPosition = 0
+        chartWindowSize = Math.min(10.0, chartTotalDuration)
+        updateChartView()
     }
 
     property string currentModule: "ECG BASELINE"
@@ -212,6 +256,8 @@ ApplicationWindow {
             heartClassRan = false
             chartWaveMarkers = {}
             heartClassAnnotations = []
+            chartScrollPosition = 0
+            chartWindowSize = 10.0
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -586,10 +632,18 @@ ApplicationWindow {
                                 }
                             }
 
+                            Item { Layout.fillWidth: true }
+
                             Button {
-                                text: "Eksportuj PNG"
+                                text: "Oddal"
                                 enabled: ekgController.hasData
-                                onClicked: exportDialog.open()
+                                onClicked: zoomChart(1.5)
+                            }
+
+                            Button {
+                                text: "Przybliż"
+                                enabled: ekgController.hasData
+                                onClicked: zoomChart(0.67)
                             }
                         }
 
@@ -707,6 +761,165 @@ ApplicationWindow {
                                 }
                             }
 
+                            Rectangle {
+                                id: chartTooltip
+                                visible: false
+                                width: tooltipContent.width + 16
+                                height: tooltipContent.height + 12
+                                radius: 6
+                                color: isDarkTheme ? "#1f2937" : "#ffffff"
+                                border.color: isDarkTheme ? "#374151" : "#d1d5db"
+                                border.width: 1
+                                z: 100
+
+                                property string labelText: ""
+                                property color labelColor: "#ffffff"
+
+                                function showTooltip(label, xVal, yVal, posX, posY, color) {
+                                    labelText = label
+                                    labelColor = color
+                                    tooltipTime.text = "Czas: " + xVal.toFixed(3) + " s"
+                                    tooltipValue.text = "Wartość: " + yVal.toFixed(3) + " mV"
+                                    x = Math.min(posX + 10, parent.width - width - 10)
+                                    y = Math.max(posY - height - 10, 10)
+                                    visible = true
+                                }
+
+                                function hide() {
+                                    visible = false
+                                }
+
+                                ColumnLayout {
+                                    id: tooltipContent
+                                    anchors.centerIn: parent
+                                    spacing: 2
+
+                                    Label {
+                                        id: tooltipLabel
+                                        text: chartTooltip.labelText
+                                        font.bold: true
+                                        font.pixelSize: 12
+                                        color: chartTooltip.labelColor
+                                    }
+
+                                    Label {
+                                        id: tooltipTime
+                                        font.pixelSize: 11
+                                        color: textSecondary
+                                    }
+
+                                    Label {
+                                        id: tooltipValue
+                                        font.pixelSize: 11
+                                        color: textSecondary
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: chartMouseArea
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                hoverEnabled: true
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                
+                                property real dragStartX: 0
+                                property real dragStartScrollPos: 0
+                                
+                                function findNearestPoint(mouseX, mouseY) {
+                                    var chartArea = signalChart.plotArea
+                                    if (!chartArea || chartArea.width <= 0) return null
+                                    
+                                    var relX = mouseX - chartArea.x
+                                    var relY = mouseY - chartArea.y
+                                    
+                                    if (relX < 0 || relX > chartArea.width || relY < 0 || relY > chartArea.height) {
+                                        return null
+                                    }
+                                    
+                                    var xMin = chartAxisX.min
+                                    var xMax = chartAxisX.max
+                                    var yMin = chartAxisY.min
+                                    var yMax = chartAxisY.max
+                                    
+                                    var timeAtMouse = xMin + (relX / chartArea.width) * (xMax - xMin)
+                                    var valueAtMouse = yMax - (relY / chartArea.height) * (yMax - yMin)
+                                    
+                                    var bestPoint = null
+                                    var bestDist = 20
+                                    
+                                    function checkSeries(series, label, color) {
+                                        if (!series.visible) return
+                                        for (var i = 0; i < series.count; i++) {
+                                            var pt = series.at(i)
+                                            var screenX = chartArea.x + (pt.x - xMin) / (xMax - xMin) * chartArea.width
+                                            var screenY = chartArea.y + (yMax - pt.y) / (yMax - yMin) * chartArea.height
+                                            var dist = Math.sqrt(Math.pow(mouseX - screenX, 2) + Math.pow(mouseY - screenY, 2))
+                                            if (dist < bestDist) {
+                                                bestDist = dist
+                                                bestPoint = { x: pt.x, y: pt.y, screenX: screenX, screenY: screenY, label: label, color: color }
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (window.currentModule === "R PEAKS") {
+                                        checkSeries(peaksSeries, "Pik R", "#ef4444")
+                                    } else if (window.currentModule === "WAVES") {
+                                        checkSeries(pOnsetSeries, "P onset", "#f59e0b")
+                                        checkSeries(pEndSeries, "P end", "#eab308")
+                                        checkSeries(qrsOnsetSeries, "QRS onset", "#8b5cf6")
+                                        checkSeries(qrsEndSeries, "QRS end", "#a78bfa")
+                                        checkSeries(tEndSeries, "T end", "#ec4899")
+                                    }
+                                    
+                                    return bestPoint
+                                }
+                                
+                                onPressed: function(mouse) {
+                                    dragStartX = mouse.x
+                                    dragStartScrollPos = chartScrollPosition
+                                    chartTooltip.hide()
+                                }
+                                
+                                onPositionChanged: function(mouse) {
+                                    if (pressed && chartTotalDuration > chartWindowSize) {
+                                        var deltaX = mouse.x - dragStartX
+                                        var chartWidth = width
+                                        var scrollableRange = chartTotalDuration - chartWindowSize
+                                        var deltaNormalized = -deltaX / chartWidth * (chartWindowSize / scrollableRange)
+                                        chartScrollPosition = Math.max(0, Math.min(1, dragStartScrollPos + deltaNormalized))
+                                        updateChartView()
+                                    } else if (!pressed) {
+                                        var point = findNearestPoint(mouse.x, mouse.y)
+                                        if (point) {
+                                            chartTooltip.showTooltip(point.label, point.x, point.y, point.screenX, point.screenY, point.color)
+                                        } else {
+                                            chartTooltip.hide()
+                                        }
+                                    }
+                                }
+                                
+                                onExited: {
+                                    chartTooltip.hide()
+                                }
+                                
+                                onWheel: function(wheel) {
+                                    if (wheel.modifiers & Qt.ControlModifier) {
+                                        if (wheel.angleDelta.y > 0) {
+                                            zoomChart(0.8)
+                                        } else {
+                                            zoomChart(1.25)
+                                        }
+                                    } else {
+                                        if (wheel.angleDelta.y > 0) {
+                                            scrollChart(-1)
+                                        } else {
+                                            scrollChart(1)
+                                        }
+                                    }
+                                }
+                            }
+
                             Label {
                                 anchors.centerIn: parent
                                 visible: !ekgController.hasData || (chartRawSeries.length === 0 && chartFilteredSeries.length === 0)
@@ -728,23 +941,7 @@ ApplicationWindow {
                                 }
                             }
                         }
-                    }
 
-                    FileDialog {
-                        id: exportDialog
-                        title: "Zapisz wykres do pliku"
-                        fileMode: FileDialog.SaveFile
-                        nameFilters: ["PNG (*.png)"]
-                        onAccepted: {
-                            if (selectedFile && signalChart) {
-                                var target = selectedFile.toString()
-                                if (!target.toLowerCase().endsWith(".png"))
-                                    target = target + ".png"
-                                signalChart.grabToImage(function(result) {
-                                    result.saveToFile(target)
-                                })
-                            }
-                        }
                     }
                 }
             }
