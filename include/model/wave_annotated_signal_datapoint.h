@@ -3,12 +3,12 @@
 #include "signal_datapoint.h"
 
 class WaveAnnotatedSignalDatapoint : public SignalDatapoint {
-    // TODO(Magda): trzeba zweryfikować
 public:
-    bool p_wave;
-    bool q_wave;
-    bool rs_wave;
-    bool t_wave;
+    bool p_wave_onset = false;
+    bool p_wave_end = false;
+    bool qrs_onset = false;
+    bool qrs_end = false;
+    bool t_end = false;
 };
 
 #endif //EKG_WAVE_ANNOTATED_SIGNAL_DATAPOINT_H
