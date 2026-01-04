@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtCharts
+import QtQml
 
 ApplicationWindow {
     id: window
@@ -223,11 +224,100 @@ ApplicationWindow {
         updateChartView()
     }
 
+    function updateAnalysisCharts() {
+        if (window.currentModule === "HRV TIME" && ekgController.hrvTimeCompleted) {
+            var powerSpectrum = ekgController.getHRVTimePowerSpectrum()
+            powerSpectrumSeries.clear()
+            var maxPower = 0
+            for (var i = 0; i < powerSpectrum.length; i++) {
+                var p = powerSpectrum[i]
+                powerSpectrumSeries.append(p.x, p.y)
+                if (p.y > maxPower) maxPower = p.y
+            }
+            hrvTimePowerAxis.max = maxPower * 1.1
+
+            var tachogram = ekgController.getHRVTimeTachogram()
+            tachogramSeries.clear()
+            var maxRR = 0, minRR = Infinity
+            for (var j = 0; j < tachogram.length; j++) {
+                var t = tachogram[j]
+                tachogramSeries.append(t.x, t.y)
+                if (t.y > maxRR) maxRR = t.y
+                if (t.y < minRR) minRR = t.y
+            }
+            if (tachogram.length > 0) {
+                hrvTimeTachogramRRAxis.min = Math.max(0, minRR * 0.9)
+                hrvTimeTachogramRRAxis.max = maxRR * 1.1
+            }
+        } else if (window.currentModule === "HRV GEO" && ekgController.hrvGeoCompleted) {
+            var histogram = ekgController.getHRVGeoHistogram()
+            if (histogram && histogram.length > 0) {
+                histogramBarSeries.clear()
+                var maxCount = 0
+                var minRR = Infinity
+                var maxRR = 0
+                for (var k = 0; k < histogram.length; k++) {
+                    var h = histogram[k]
+                    if (h && h.x !== undefined && h.y !== undefined) {
+                        histogramBarSeries.append(h.x, h.y)
+                        if (h.y > maxCount) maxCount = h.y
+                        if (h.x < minRR) minRR = h.x
+                        if (h.x > maxRR) maxRR = h.x
+                    }
+                }
+                if (histogramBarSeries.count > 0) {
+                    hrvGeoHistogramAxisY.max = maxCount * 1.1
+                    hrvGeoHistogramAxisY.min = 0
+                    var margin = (maxRR - minRR) * 0.05
+                    hrvGeoHistogramAxisX.min = Math.max(0, minRR - margin)
+                    hrvGeoHistogramAxisX.max = maxRR + margin
+                }
+            }
+
+            var poincare = ekgController.getHRVGeoPoincare()
+            if (poincare && poincare.length > 0) {
+                poincareSeries.clear()
+                var maxRRGeo = 0, minRRGeo = Infinity
+                for (var l = 0; l < poincare.length; l++) {
+                    var pc = poincare[l]
+                    if (pc && pc.x !== undefined && pc.y !== undefined) {
+                        poincareSeries.append(pc.x, pc.y)
+                        if (pc.x > maxRRGeo) maxRRGeo = pc.x
+                        if (pc.y > maxRRGeo) maxRRGeo = pc.y
+                        if (pc.x < minRRGeo) minRRGeo = pc.x
+                        if (pc.y < minRRGeo) minRRGeo = pc.y
+                    }
+                }
+                if (poincareSeries.count > 0) {
+                    var margin = (maxRRGeo - minRRGeo) * 0.1
+                    hrvGeoPoincareAxisX.min = Math.max(0, minRRGeo - margin)
+                    hrvGeoPoincareAxisX.max = maxRRGeo + margin
+                    hrvGeoPoincareAxisY.min = Math.max(0, minRRGeo - margin)
+                    hrvGeoPoincareAxisY.max = maxRRGeo + margin
+                }
+            }
+        } else if (window.currentModule === "HEART CLASS" && ekgController.heartClassCompleted) {
+            var barData = ekgController.getHeartClassBarChart()
+            
+            var values = [barData.N, barData.V, barData.A, barData.Other]
+            heartClassBarSet.values = values
+            
+            heartClassBarCategoryAxis.categories = ["N", "V", "A", "Inne"]
+            
+            var maxBar = Math.max(barData.N, Math.max(barData.V, Math.max(barData.A, barData.Other)))
+            if (maxBar > 0) {
+                heartClassBarAxisY.max = maxBar * 1.1
+                heartClassBarAxisY.min = 0
+            }
+        }
+    }
+
     property string currentModule: "ECG BASELINE"
     onCurrentModuleChanged: {
         analysisStatus.isProcessing = false
         analysisProgress.value = 0
         updateMarkerVisibility()
+        Qt.callLater(updateAnalysisCharts)
     }
 
     function updateMarkerVisibility() {
@@ -306,6 +396,7 @@ ApplicationWindow {
             lastUsedHRVTimeMethod = methodName
             analysisStatus.isProcessing = false
             analysisProgress.value = 100
+            Qt.callLater(updateAnalysisCharts)
         }
         function onHrvTimeError(errorMessage) {
             analysisStatus.isProcessing = false
@@ -316,12 +407,16 @@ ApplicationWindow {
             if (ekgController.hrvTimeCompleted) {
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
+                if (window.currentModule === "HRV TIME") {
+                    Qt.callLater(updateAnalysisCharts)
+                }
             }
         }
         function onHrvGeoSuccess() {
             hrvGeoRan = true
             analysisStatus.isProcessing = false
             analysisProgress.value = 100
+            Qt.callLater(updateAnalysisCharts)
         }
         function onHrvGeoError(errorMessage) {
             analysisStatus.isProcessing = false
@@ -332,6 +427,9 @@ ApplicationWindow {
             if (ekgController.hrvGeoCompleted) {
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
+                if (window.currentModule === "HRV GEO") {
+                    Qt.callLater(updateAnalysisCharts)
+                }
             }
         }
         function onWavesSuccess() {
@@ -357,6 +455,7 @@ ApplicationWindow {
             heartClassAnnotations = ekgController.getHeartClassAnnotations()
             analysisStatus.isProcessing = false
             analysisProgress.value = 100
+            Qt.callLater(updateAnalysisCharts)
         }
         function onHeartClassError(errorMessage) {
             analysisStatus.isProcessing = false
@@ -368,6 +467,9 @@ ApplicationWindow {
                 heartClassAnnotations = ekgController.getHeartClassAnnotations()
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
+                if (window.currentModule === "HEART CLASS") {
+                    Qt.callLater(updateAnalysisCharts)
+                }
             }
         }
     }
@@ -623,7 +725,8 @@ ApplicationWindow {
                                 id: channelCombo
                                 model: channelOptions
                                 Layout.preferredWidth: 150
-                                enabled: model.length > 0 && !chartLoading
+                                enabled: model.length > 0 && !chartLoading && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
                                 currentIndex: selectedChannelIndex
                                 onActivated: {
                                     selectedChannelIndex = currentIndex
@@ -636,13 +739,15 @@ ApplicationWindow {
 
                             Button {
                                 text: "Oddal"
-                                enabled: ekgController.hasData
+                                enabled: ekgController.hasData && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
                                 onClicked: zoomChart(1.5)
                             }
 
                             Button {
                                 text: "Przybliż"
-                                enabled: ekgController.hasData
+                                enabled: ekgController.hasData && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
                                 onClicked: zoomChart(0.67)
                             }
                         }
@@ -661,6 +766,7 @@ ApplicationWindow {
                                 legend.alignment: Qt.AlignTop
                                 legend.labelColor: textSecondary
                                 enabled: ekgController.hasData
+                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
 
                                 ValueAxis {
                                     id: chartAxisX
@@ -938,6 +1044,209 @@ ApplicationWindow {
                                     running: chartLoading
                                     width: 64
                                     height: 64
+                                }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                visible: window.currentModule === "HRV TIME" && ekgController.hrvTimeCompleted
+                                spacing: 8
+
+                                Label {
+                                    text: "Widmo mocy"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true
+                                }
+
+                                ChartView {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: parent.height * 0.5 - 20
+                                    antialiasing: true
+                                    theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                    backgroundColor: vizBg
+                                    legend.visible: false
+
+                                    ValueAxis {
+                                        id: hrvTimeFreqAxis
+                                        titleText: "Częstotliwość [Hz]"
+                                        labelsColor: textSecondary
+                                        min: 0
+                                        max: 0.5
+                                    }
+
+                                    ValueAxis {
+                                        id: hrvTimePowerAxis
+                                        titleText: "Moc widma [ms²/Hz]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    LineSeries {
+                                        id: powerSpectrumSeries
+                                        axisX: hrvTimeFreqAxis
+                                        axisY: hrvTimePowerAxis
+                                        color: "#10b981"
+                                        width: 2
+                                    }
+                                }
+
+                                Label {
+                                    text: "Tachogram RR"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true
+                                }
+
+                                ChartView {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    antialiasing: true
+                                    theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                    backgroundColor: vizBg
+                                    legend.visible: false
+
+                                    ValueAxis {
+                                        id: hrvTimeTachogramTimeAxis
+                                        titleText: "Czas [s]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    ValueAxis {
+                                        id: hrvTimeTachogramRRAxis
+                                        titleText: "RR [ms]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    LineSeries {
+                                        id: tachogramSeries
+                                        axisX: hrvTimeTachogramTimeAxis
+                                        axisY: hrvTimeTachogramRRAxis
+                                        color: "#60a5fa"
+                                        width: 2
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                visible: window.currentModule === "HRV GEO" && ekgController.hrvGeoCompleted
+                                spacing: 8
+
+                                Label {
+                                    text: "Histogram interwałów RR"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true
+                                }
+
+                                ChartView {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: parent.height * 0.5 - 20
+                                    antialiasing: true
+                                    theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                    backgroundColor: vizBg
+                                    legend.visible: false
+
+                                    ValueAxis {
+                                        id: hrvGeoHistogramAxisX
+                                        titleText: "RR [ms]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    ValueAxis {
+                                        id: hrvGeoHistogramAxisY
+                                        titleText: "Liczba"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    LineSeries {
+                                        id: histogramBarSeries
+                                        axisX: hrvGeoHistogramAxisX
+                                        axisY: hrvGeoHistogramAxisY
+                                        color: "#10b981"
+                                        width: 3
+                                    }
+                                }
+
+                                Label {
+                                    text: "Wykres Poincaré"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true
+                                }
+
+                                ChartView {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    antialiasing: true
+                                    theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                    backgroundColor: vizBg
+                                    legend.visible: false
+
+                                    ValueAxis {
+                                        id: hrvGeoPoincareAxisX
+                                        titleText: "RR(n) [ms]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    ValueAxis {
+                                        id: hrvGeoPoincareAxisY
+                                        titleText: "RR(n+1) [ms]"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    ScatterSeries {
+                                        id: poincareSeries
+                                        axisX: hrvGeoPoincareAxisX
+                                        axisY: hrvGeoPoincareAxisY
+                                        color: "#8b5cf6"
+                                        markerSize: 4
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                visible: window.currentModule === "HEART CLASS" && ekgController.heartClassCompleted
+                                spacing: 8
+
+                                Label {
+                                    text: "Liczność klas QRS"
+                                    font.bold: true
+                                    font.pixelSize: 14
+                                    Layout.fillWidth: true
+                                }
+
+                                ChartView {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    antialiasing: true
+                                    theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
+                                    backgroundColor: vizBg
+                                    legend.visible: true
+                                    legend.alignment: Qt.AlignTop
+                                    legend.labelColor: textSecondary
+
+                                    BarCategoryAxis {
+                                        id: heartClassBarCategoryAxis
+                                    }
+
+                                    ValueAxis {
+                                        id: heartClassBarAxisY
+                                        titleText: "Liczba"
+                                        labelsColor: textSecondary
+                                    }
+
+                                    BarSeries {
+                                        id: heartClassBarSeries
+                                        axisX: heartClassBarCategoryAxis
+                                        axisY: heartClassBarAxisY
+                                        
+                                        BarSet {
+                                            id: heartClassBarSet
+                                            label: "Klasy"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1655,6 +1964,18 @@ ApplicationWindow {
                     color: Material.color(Material.Teal)
                 }
 
+                Label { text: "NN50:" }
+                Label {
+                    text: ekgController.hrvTimeCompleted ? ekgController.getHRVTimeMetrics().nn50 : "-"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "PNN50:" }
+                Label {
+                    text: ekgController.hrvTimeCompleted ? ekgController.getHRVTimeMetrics().pnn50.toFixed(2) + " %" : "-"
+                    color: Material.color(Material.Teal)
+                }
+
                 Label {
                     text: "Metryki czestotliwosciowe:"
                     font.bold: true
@@ -1940,10 +2261,55 @@ ApplicationWindow {
                     Layout.columnSpan: 2
                 }
 
-                Label { text: "Liczba uderzen:" }
+                Label { text: "Normalne (N):" }
                 Label {
-                    text: heartClassAnnotations.length
+                    text: {
+                        if (!ekgController.heartClassCompleted) return "-"
+                        var barData = ekgController.getHeartClassBarChart()
+                        return barData.N + " (" + barData.percentN.toFixed(1) + "%)"
+                    }
+                    color: Material.color(Material.Green)
+                }
+
+                Label { text: "Komorowe (V):" }
+                Label {
+                    text: {
+                        if (!ekgController.heartClassCompleted) return "-"
+                        var barData = ekgController.getHeartClassBarChart()
+                        return barData.V + " (" + barData.percentV.toFixed(1) + "%)"
+                    }
+                    color: Material.color(Material.Red)
+                }
+
+                Label { text: "Przedsionkowe (A):" }
+                Label {
+                    text: {
+                        if (!ekgController.heartClassCompleted) return "-"
+                        var barData = ekgController.getHeartClassBarChart()
+                        return barData.A + " (" + barData.percentA.toFixed(1) + "%)"
+                    }
+                    color: Material.color(Material.Orange)
+                }
+
+                Label { text: "Inne:" }
+                Label {
+                    text: {
+                        if (!ekgController.heartClassCompleted) return "-"
+                        var barData = ekgController.getHeartClassBarChart()
+                        return barData.Other + " (" + barData.percentOther.toFixed(1) + "%)"
+                    }
+                    color: Material.color(Material.Grey)
+                }
+
+                Label { text: "Razem:" }
+                Label {
+                    text: {
+                        if (!ekgController.heartClassCompleted) return "-"
+                        var barData = ekgController.getHeartClassBarChart()
+                        return barData.total
+                    }
                     color: Material.color(Material.Teal)
+                    font.bold: true
                 }
             }
 

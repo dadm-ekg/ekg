@@ -65,9 +65,12 @@ public:
     Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
     Q_INVOKABLE QVariantMap getHRVTimeMetrics() const;
+    Q_INVOKABLE QVariantList getHRVTimePowerSpectrum() const;
+    Q_INVOKABLE QVariantList getHRVTimeTachogram() const;
     Q_INVOKABLE QVariantMap getHRVGeoMetrics() const;
     Q_INVOKABLE QVariantList getHRVGeoHistogram() const;
     Q_INVOKABLE QVariantList getHRVGeoPoincare() const;
+    Q_INVOKABLE QVariantMap getHeartClassBarChart() const;
     Q_INVOKABLE QVariantMap getWaveMarkers(int channel = 0) const;
     Q_INVOKABLE QVariantList getHeartClassAnnotations() const;
     Q_INVOKABLE int channelCount() const;

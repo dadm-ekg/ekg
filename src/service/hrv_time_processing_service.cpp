@@ -74,6 +74,20 @@ void CalculateTimeDomainMetrics(
     } else {
         metrics.rmssd = 0.0f;
     }
+    
+    // NN50 - liczba par kolejnych odstępów RR różniących się o więcej niż 50 ms
+    // PNN50 - procent par kolejnych odstępów RR różniących się o więcej niż 50 ms
+    int nn50_count = 0;
+    if (rr_intervals.size() > 1) {
+        for (size_t i = 1; i < rr_intervals.size(); ++i) {
+            double diff = std::abs(rr_intervals[i] - rr_intervals[i - 1]);
+            if (diff > 50.0) {
+                nn50_count++;
+            }
+        }
+    }
+    metrics.nn50 = nn50_count;
+    metrics.pnn50 = rr_intervals.size() > 1 ? static_cast<float>(nn50_count * 100.0 / (rr_intervals.size() - 1)) : 0.0f;
 }
 
 // Interpolacja sygnału RR do równomiernego próbkowania
@@ -344,6 +358,8 @@ HRVTimeMetrics HRVTimeProcessingService::Process(
         metrics.rr_mean = 0.0f;
         metrics.sdnn = 0.0f;
         metrics.rmssd = 0.0f;
+        metrics.nn50 = 0;
+        metrics.pnn50 = 0.0f;
         metrics.tp = 0.0f;
         metrics.vlf = 0.0f;
         metrics.lf = 0.0f;
@@ -359,6 +375,8 @@ HRVTimeMetrics HRVTimeProcessingService::Process(
         metrics.rr_mean = 0.0f;
         metrics.sdnn = 0.0f;
         metrics.rmssd = 0.0f;
+        metrics.nn50 = 0;
+        metrics.pnn50 = 0.0f;
         metrics.tp = 0.0f;
         metrics.vlf = 0.0f;
         metrics.lf = 0.0f;
@@ -380,6 +398,15 @@ HRVTimeMetrics HRVTimeProcessingService::Process(
         metrics.lf = 0.0f;
         metrics.hf = 0.0f;
         metrics.lf_hf = 0.0f;
+        metrics.rr_intervals = rr_intervals;
+        double cumulative_time = 0.0;
+        for (size_t i = 0; i < rr_intervals.size(); ++i) {
+            metrics.tachogram_times.push_back(cumulative_time / 1000.0);
+            cumulative_time += rr_intervals[i];
+        }
+        if (!rr_intervals.empty()) {
+            metrics.tachogram_times.push_back(cumulative_time / 1000.0);
+        }
         return metrics;
     }
     
@@ -422,6 +449,22 @@ HRVTimeMetrics HRVTimeProcessingService::Process(
     
     // 5. Oblicz parametry częstotliwościowe
     CalculateFrequencyDomainMetrics(power_spectrum, frequencies, target_sampling_rate, metrics);
+    
+    // 6. Zapisz dane do wizualizacji
+    metrics.power_spectrum = power_spectrum;
+    metrics.frequencies = frequencies;
+    metrics.rr_intervals = rr_intervals;
+    
+    // Generuj czasy dla tachogramu RR
+    metrics.tachogram_times.clear();
+    double cumulative_time = 0.0;
+    for (size_t i = 0; i < rr_intervals.size(); ++i) {
+        metrics.tachogram_times.push_back(cumulative_time / 1000.0); // Konwersja ms na sekundy
+        cumulative_time += rr_intervals[i];
+    }
+    if (!rr_intervals.empty()) {
+        metrics.tachogram_times.push_back(cumulative_time / 1000.0);
+    }
     
     return metrics;
 }

@@ -325,6 +325,37 @@ QVariantList EkgController::getHeartClassAnnotations() const {
     return result;
 }
 
+QVariantMap EkgController::getHeartClassBarChart() const {
+    QVariantMap result;
+    
+    int countN = 0, countV = 0, countA = 0, countOther = 0;
+    int total = static_cast<int>(cached_heart_class_result_.annotations.size());
+    
+    for (const auto& [sampleIdx, label] : cached_heart_class_result_.annotations) {
+        if (label == "N") {
+            countN++;
+        } else if (label == "V") {
+            countV++;
+        } else if (label == "A") {
+            countA++;
+        } else {
+            countOther++;
+        }
+    }
+    
+    result["N"] = countN;
+    result["V"] = countV;
+    result["A"] = countA;
+    result["Other"] = countOther;
+    result["total"] = total;
+    result["percentN"] = total > 0 ? (countN * 100.0 / total) : 0.0;
+    result["percentV"] = total > 0 ? (countV * 100.0 / total) : 0.0;
+    result["percentA"] = total > 0 ? (countA * 100.0 / total) : 0.0;
+    result["percentOther"] = total > 0 ? (countOther * 100.0 / total) : 0.0;
+    
+    return result;
+}
+
 QStringList EkgController::getAvailableFiles() const {
     QString appDir = QCoreApplication::applicationDirPath();
     QDir dir(appDir);
@@ -473,12 +504,42 @@ QVariantMap EkgController::getHRVTimeMetrics() const {
     metrics["rr_mean"] = static_cast<double>(cached_hrv_metrics_.rr_mean);
     metrics["sdnn"] = static_cast<double>(cached_hrv_metrics_.sdnn);
     metrics["rmssd"] = static_cast<double>(cached_hrv_metrics_.rmssd);
+    metrics["nn50"] = cached_hrv_metrics_.nn50;
+    metrics["pnn50"] = static_cast<double>(cached_hrv_metrics_.pnn50);
     metrics["tp"] = static_cast<double>(cached_hrv_metrics_.tp);
     metrics["vlf"] = static_cast<double>(cached_hrv_metrics_.vlf);
     metrics["lf"] = static_cast<double>(cached_hrv_metrics_.lf);
     metrics["hf"] = static_cast<double>(cached_hrv_metrics_.hf);
     metrics["lf_hf"] = static_cast<double>(cached_hrv_metrics_.lf_hf);
     return metrics;
+}
+
+QVariantList EkgController::getHRVTimePowerSpectrum() const {
+    QVariantList result;
+    const auto& power = cached_hrv_metrics_.power_spectrum;
+    const auto& freqs = cached_hrv_metrics_.frequencies;
+    
+    for (size_t i = 0; i < power.size() && i < freqs.size(); ++i) {
+        QVariantMap entry;
+        entry["x"] = freqs[i];
+        entry["y"] = power[i];
+        result.append(entry);
+    }
+    return result;
+}
+
+QVariantList EkgController::getHRVTimeTachogram() const {
+    QVariantList result;
+    const auto& rr = cached_hrv_metrics_.rr_intervals;
+    const auto& times = cached_hrv_metrics_.tachogram_times;
+    
+    for (size_t i = 0; i < rr.size() && i + 1 < times.size(); ++i) {
+        QVariantMap entry;
+        entry["x"] = times[i];
+        entry["y"] = rr[i];
+        result.append(entry);
+    }
+    return result;
 }
 
 QVariantMap EkgController::getHRVGeoMetrics() const {
