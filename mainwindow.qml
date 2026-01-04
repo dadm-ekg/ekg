@@ -495,6 +495,7 @@ ApplicationWindow {
                 ComboBox {
                     id: moduleCombo
                     Layout.fillWidth: true
+                    enabled: !analysisStatus.isProcessing && !chartLoading
                     model: [
                         "ECG BASELINE",
                         "R PEAKS",
