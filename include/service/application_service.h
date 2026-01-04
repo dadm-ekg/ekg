@@ -6,8 +6,10 @@
 #include "abstract/filter_service.h"
 #include "abstract/r_peaks_detection_service.h"
 #include "abstract/hrv_time_processing_service.h"
+#include "abstract/hrv_geo_processing_service.h"
 #include "../dto/filter_method.h"
 #include "../dto/hrv_time_metrics.h"
+#include "../dto/hrv_geo_metrics.h"
 
 class ApplicationService : public IApplicationService {
     std::shared_ptr<ISignalRepository> signal_repository_;
@@ -15,6 +17,7 @@ class ApplicationService : public IApplicationService {
     std::shared_ptr<IFilterService> moving_average_filter_service_;
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service_;
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service_;
+    std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service_;
 
     QString loaded_filename;
     std::shared_ptr<SignalDataset> loaded_dataset;
@@ -27,7 +30,8 @@ public:
         std::shared_ptr<IFilterService> butterworth_filter_service,
         std::shared_ptr<IFilterService> moving_average_filter_service,
         std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
-        std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service
+        std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
+        std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service
     );
 
     bool Load(const QString &filename) override;
@@ -51,6 +55,8 @@ public:
     bool CalculateRPeaks(RPeaksDetectionMethod method) const override;
 
     HRVTimeMetrics CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const override;
+
+    HRVGeoMetrics CalculateHRVGeo() const override;
 };
 
 #endif

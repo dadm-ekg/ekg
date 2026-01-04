@@ -39,6 +39,7 @@ ApplicationWindow {
     property string lastUsedFilter: ""
     property string lastUsedRPeaksMethod: ""
     property string lastUsedHRVTimeMethod: ""
+    property bool hrvGeoRan: false
     property int selectedFilterMethod: -1
     property int selectedRPeaksMethod: -1
     property int selectedHRVTimeMethod: -1
@@ -177,6 +178,7 @@ ApplicationWindow {
             selectedFilterMethod = -1
             selectedRPeaksMethod = -1
             selectedHRVTimeMethod = -1
+            hrvGeoRan = false
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -233,6 +235,22 @@ ApplicationWindow {
         }
         function onHrvTimeCompletedChanged() {
             if (ekgController.hrvTimeCompleted) {
+                analysisStatus.isProcessing = false
+                analysisProgress.value = 100
+            }
+        }
+        function onHrvGeoSuccess() {
+            hrvGeoRan = true
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 100
+        }
+        function onHrvGeoError(errorMessage) {
+            analysisStatus.isProcessing = false
+            analysisProgress.value = 0
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+        function onHrvGeoCompletedChanged() {
+            if (ekgController.hrvGeoCompleted) {
                 analysisStatus.isProcessing = false
                 analysisProgress.value = 100
             }
@@ -433,7 +451,8 @@ ApplicationWindow {
                     model: [
                         "ECG BASELINE",
                         "R PEAKS",
-                        "HRV TIME"
+                        "HRV TIME",
+                        "HRV GEO"
                     ]
                     onCurrentTextChanged: window.currentModule = currentText
 
@@ -645,6 +664,14 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
+                Label {
+                    visible: !ekgController.rPeaksCompleted && window.currentModule === "HRV GEO"
+                    text: "⚠️ Najpierw uruchom detekcje pikow R"
+                    color: Material.color(Material.Orange)
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+
                 Loader {
                     id: paramsLoader
                     Layout.fillWidth: true
@@ -652,6 +679,7 @@ ApplicationWindow {
                         window.currentModule === "ECG BASELINE" ? baselineParams :
                         window.currentModule === "R PEAKS"      ? rPeaksParams :
                         window.currentModule === "HRV TIME"     ? hrvTimeParams :
+                        window.currentModule === "HRV GEO"      ? hrvGeoParams :
                         null
                 }
 
@@ -716,6 +744,19 @@ ApplicationWindow {
                                         return "Skonczono"
                                     }
                                 }
+                            } else if (module === "HRV GEO") {
+                                var hrvGeoOK = ekgController.hrvGeoCompleted
+                                if (!hasData) {
+                                    return "Oczekiwanie na plik"
+                                } else if (!rPeaksOK) {
+                                    return "Oczekiwanie na detekcje R"
+                                } else if (isProcessing) {
+                                    return "Przetwarzanie..."
+                                } else if (!hrvGeoOK) {
+                                    return "Gotowy"
+                                } else {
+                                    return "Obliczono metryki geometryczne"
+                                }
                             } else {
                                 return hasData ? "Oczekiwanie na analize" : "Oczekiwanie na import"
                             }
@@ -745,6 +786,13 @@ ApplicationWindow {
                                 if (!rPeaksOK) return textSecondary
                                 if (isProcessing) return Material.color(Material.Orange)
                                 if (!hrvTimeOK) return Material.color(Material.Teal)
+                                return Material.color(Material.Green)
+                            } else if (module === "HRV GEO") {
+                                var hrvGeoOK = ekgController.hrvGeoCompleted
+                                if (!hasData) return textSecondary
+                                if (!rPeaksOK) return textSecondary
+                                if (isProcessing) return Material.color(Material.Orange)
+                                if (!hrvGeoOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             }
                             return textSecondary
@@ -785,6 +833,8 @@ ApplicationWindow {
                                 return params && params.isReady && params.isReady()
                             } else if (window.currentModule === "HRV TIME") {
                                 return params && params.isReady && params.isReady()
+                            } else if (window.currentModule === "HRV GEO") {
+                                return ekgController.rPeaksCompleted
                             }
                             return true
                         }
@@ -804,6 +854,8 @@ ApplicationWindow {
                                 return "Najpierw uruchom detekcję pików R"
                             } else if (window.currentModule === "HRV TIME" && (!params || !params.isReady || !params.isReady())) {
                                 return "Wybierz metodę estymacji widma"
+                            } else if (window.currentModule === "HRV GEO" && !ekgController.rPeaksCompleted) {
+                                return "Najpierw uruchom detekcję pików R"
                             }
                             return ""
                         }
@@ -822,6 +874,10 @@ ApplicationWindow {
                                 if (paramsLoader.item && paramsLoader.item.runHRVTime) {
                                     paramsLoader.item.runHRVTime()
                                 }
+                            } else if (window.currentModule === "HRV GEO") {
+                                if (paramsLoader.item && paramsLoader.item.runHRVGeo) {
+                                    paramsLoader.item.runHRVGeo()
+                                }
                             }
                         }
                     }
@@ -838,6 +894,7 @@ ApplicationWindow {
                                 lastUsedFilter = ""
                                 lastUsedRPeaksMethod = ""
                                 lastUsedHRVTimeMethod = ""
+                                hrvGeoRan = false
                                 selectedFilterMethod = -1
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
@@ -851,6 +908,7 @@ ApplicationWindow {
                                 ekgController.resetRPeaks()
                                 lastUsedRPeaksMethod = ""
                                 lastUsedHRVTimeMethod = ""
+                                hrvGeoRan = false
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
                                 chartRPeaksSeries = []
@@ -860,6 +918,9 @@ ApplicationWindow {
                                 ekgController.resetHRVTime()
                                 lastUsedHRVTimeMethod = ""
                                 selectedHRVTimeMethod = -1
+                            } else if (window.currentModule === "HRV GEO") {
+                                ekgController.resetHRVGeo()
+                                hrvGeoRan = false
                             } else {
                                 chartRawSeries = []
                                 chartFilteredSeries = []
@@ -1195,6 +1256,99 @@ ApplicationWindow {
         }
     }
 
+    Component {
+        id: hrvGeoParams
+
+        ColumnLayout {
+            id: hrvGeoRoot
+            Layout.fillWidth: true
+            spacing: 8
+
+            function isReady() {
+                return ekgController.rPeaksCompleted
+            }
+
+            function resetState() {
+            }
+
+            function runHRVGeo() {
+                analysisStatus.isProcessing = true
+                analysisProgress.value = 0
+                ekgController.runHRVGeo()
+            }
+
+            Label {
+                text: "Metryki geometryczne HRV"
+                font.bold: true
+                font.pixelSize: 14
+            }
+
+            Label {
+                text: "Ten modul oblicza metryki geometryczne na podstawie wykrytych pikow R."
+                color: textSecondary
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: borderColor
+                visible: ekgController.hrvGeoCompleted
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+            }
+
+            GridLayout {
+                visible: ekgController.hrvGeoCompleted
+                columns: 2
+                columnSpacing: 12
+                rowSpacing: 6
+                Layout.fillWidth: true
+
+                Label {
+                    text: "Indeks trojkatny:"
+                    font.bold: true
+                    font.pixelSize: 14
+                    Layout.columnSpan: 2
+                }
+
+                Label { text: "Triangular Index:" }
+                Label {
+                    text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().triangular_index.toFixed(2) : "-"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "TINN:" }
+                Label {
+                    text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().tinn.toFixed(2) + " ms" : "-"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label {
+                    text: "Poincare (SD):"
+                    font.bold: true
+                    font.pixelSize: 14
+                    Layout.columnSpan: 2
+                    Layout.topMargin: 8
+                }
+
+                Label { text: "SD1:" }
+                Label {
+                    text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().sd1.toFixed(2) + " ms" : "-"
+                    color: Material.color(Material.Teal)
+                }
+
+                Label { text: "SD2:" }
+                Label {
+                    text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().sd2.toFixed(2) + " ms" : "-"
+                    color: Material.color(Material.Teal)
+                }
+            }
+        }
+    }
+
     Dialog {
         id: helpDialog
         title: "Jak korzystac z EKG Analyzer"
@@ -1215,7 +1369,7 @@ ApplicationWindow {
             Label {
                 leftPadding: 8
                 text: "1. Wybierz plik EKG (Import sygnalu).\n" +
-                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS lub HRV TIME).\n" +
+                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, HRV TIME lub HRV GEO).\n" +
                       "3. Ustaw parametry w prawym panelu.\n" +
                       "4. Kliknij 'Uruchom analize', aby przetworzyc sygnal.\n\n"
                 wrapMode: Text.WordWrap

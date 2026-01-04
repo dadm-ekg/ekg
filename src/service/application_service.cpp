@@ -11,13 +11,15 @@ ApplicationService::ApplicationService(
     std::shared_ptr<IFilterService> butterworth_filter_service,
     std::shared_ptr<IFilterService> moving_average_filter_service,
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
-    std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service
+    std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
+    std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service
 )
     : signal_repository_(std::move(signal_repository)),
       butterworth_filter_service_(std::move(butterworth_filter_service)),
       moving_average_filter_service_(std::move(moving_average_filter_service)),
       r_peaks_detection_service_(std::move(r_peaks_detection_service)),
-      hrv_time_processing_service_(std::move(hrv_time_processing_service)) {
+      hrv_time_processing_service_(std::move(hrv_time_processing_service)),
+      hrv_geo_processing_service_(std::move(hrv_geo_processing_service)) {
 }
 
 bool ApplicationService::Load(const QString &filename) {
@@ -97,5 +99,15 @@ HRVTimeMetrics ApplicationService::CalculateHRVTime(HRVTimeMetrics::SpectralMeth
         *r_peaks, 
         filtered_dataset->frequency, 
         method
+    );
+}
+
+HRVGeoMetrics ApplicationService::CalculateHRVGeo() const {
+    if (filtered_dataset == nullptr || r_peaks == nullptr) {
+        return HRVGeoMetrics{};
+    }
+    return hrv_geo_processing_service_->Process(
+        *r_peaks,
+        filtered_dataset->frequency
     );
 }

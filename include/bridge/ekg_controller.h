@@ -17,6 +17,7 @@ class EkgController : public QObject {
     Q_PROPERTY(bool baselineCompleted READ baselineCompleted NOTIFY baselineCompletedChanged)
     Q_PROPERTY(bool rPeaksCompleted READ rPeaksCompleted NOTIFY rPeaksCompletedChanged)
     Q_PROPERTY(bool hrvTimeCompleted READ hrvTimeCompleted NOTIFY hrvTimeCompletedChanged)
+    Q_PROPERTY(bool hrvGeoCompleted READ hrvGeoCompleted NOTIFY hrvGeoCompletedChanged)
 
 public:
     enum FilterMethod {
@@ -47,15 +48,20 @@ public:
     Q_INVOKABLE bool runBaseline(int filterMethod);
     Q_INVOKABLE bool runRPeaksDetection(int method);
     Q_INVOKABLE bool runHRVTime(int method);
+    Q_INVOKABLE bool runHRVGeo();
     Q_INVOKABLE QStringList getAvailableFiles() const;
     Q_INVOKABLE void loadFileByName(const QString &filename);
     Q_INVOKABLE void resetBaseline();
     Q_INVOKABLE void resetRPeaks();
     Q_INVOKABLE void resetHRVTime();
+    Q_INVOKABLE void resetHRVGeo();
     Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
     Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
     Q_INVOKABLE QVariantMap getHRVTimeMetrics() const;
+    Q_INVOKABLE QVariantMap getHRVGeoMetrics() const;
+    Q_INVOKABLE QVariantList getHRVGeoHistogram() const;
+    Q_INVOKABLE QVariantList getHRVGeoPoincare() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
 
@@ -66,6 +72,7 @@ public:
     bool baselineCompleted() const;
     bool rPeaksCompleted() const;
     bool hrvTimeCompleted() const;
+    bool hrvGeoCompleted() const;
 
 signals:
     void loadedFilenameChanged();
@@ -75,6 +82,7 @@ signals:
     void baselineCompletedChanged();
     void rPeaksCompletedChanged();
     void hrvTimeCompletedChanged();
+    void hrvGeoCompletedChanged();
     void fileLoadSuccess(const QString &filename);
     void fileLoadError(const QString &errorMessage);
     void filteringSuccess(const QString &filterName);
@@ -83,13 +91,17 @@ signals:
     void rPeaksDetectionError(const QString &errorMessage);
     void hrvTimeSuccess(const QString &methodName);
     void hrvTimeError(const QString &errorMessage);
+    void hrvGeoSuccess();
+    void hrvGeoError(const QString &errorMessage);
 
 private:
     std::shared_ptr<IApplicationService> application_service_;
     bool baseline_completed_ = false;
     bool r_peaks_completed_ = false;
     bool hrv_time_completed_ = false;
+    bool hrv_geo_completed_ = false;
     HRVTimeMetrics cached_hrv_metrics_;
+    HRVGeoMetrics cached_hrv_geo_metrics_;
 };
 
 #endif

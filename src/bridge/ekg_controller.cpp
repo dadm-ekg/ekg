@@ -26,12 +26,14 @@ void EkgController::loadData(const QString &filename) {
         baseline_completed_ = false;
         r_peaks_completed_ = false;
         hrv_time_completed_ = false;
+        hrv_geo_completed_ = false;
         emit loadedFilenameChanged();
         emit isFileLoadedChanged();
         emit hasDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
+        emit hrvGeoCompletedChanged();
         emit fileLoadSuccess(filename);
     } else {
         emit fileLoadError("Nie udało się załadować pliku");
@@ -89,10 +91,12 @@ bool EkgController::runBaseline(int filterMethod) {
         baseline_completed_ = true;
         r_peaks_completed_ = false;
         hrv_time_completed_ = false;
+        hrv_geo_completed_ = false;
         emit hasFilteredDataChanged();
         emit baselineCompletedChanged();
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
+        emit hrvGeoCompletedChanged();
         emit filteringSuccess(filterName);
     } else {
         emit filteringError("Nie udało się zastosować filtra " + filterName);
@@ -133,8 +137,10 @@ bool EkgController::runRPeaksDetection(int method) {
     if (success) {
         r_peaks_completed_ = true;
         hrv_time_completed_ = false;
+        hrv_geo_completed_ = false;
         emit rPeaksCompletedChanged();
         emit hrvTimeCompletedChanged();
+        emit hrvGeoCompletedChanged();
         emit rPeaksDetectionSuccess(methodName);
     } else {
         emit rPeaksDetectionError("Nie udało się wykryć pików R metodą " + methodName);
@@ -178,6 +184,20 @@ bool EkgController::runHRVTime(int method) {
     return true;
 }
 
+bool EkgController::runHRVGeo() {
+    if (!rPeaksCompleted()) {
+        emit hrvGeoError("Brak wykrytych pików R. Najpierw uruchom detekcję pików R.");
+        return false;
+    }
+
+    cached_hrv_geo_metrics_ = application_service_->CalculateHRVGeo();
+    hrv_geo_completed_ = true;
+    emit hrvGeoCompletedChanged();
+    emit hrvGeoSuccess();
+
+    return true;
+}
+
 QString EkgController::loadedFilename() const {
     return application_service_->GetLoadedFilename();
 }
@@ -206,10 +226,20 @@ bool EkgController::hrvTimeCompleted() const {
     return hrv_time_completed_;
 }
 
+bool EkgController::hrvGeoCompleted() const {
+    return hrv_geo_completed_;
+}
+
 void EkgController::resetHRVTime() {
     hrv_time_completed_ = false;
     cached_hrv_metrics_ = HRVTimeMetrics{};
     emit hrvTimeCompletedChanged();
+}
+
+void EkgController::resetHRVGeo() {
+    hrv_geo_completed_ = false;
+    cached_hrv_geo_metrics_ = HRVGeoMetrics{};
+    emit hrvGeoCompletedChanged();
 }
 
 QStringList EkgController::getAvailableFiles() const {
@@ -260,18 +290,22 @@ void EkgController::resetBaseline() {
     baseline_completed_ = false;
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
+    hrv_geo_completed_ = false;
     emit hasFilteredDataChanged();
     emit baselineCompletedChanged();
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
+    emit hrvGeoCompletedChanged();
 }
 
 void EkgController::resetRPeaks() {
     application_service_->ClearRPeaks();
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
+    hrv_geo_completed_ = false;
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
+    emit hrvGeoCompletedChanged();
 }
 
 namespace {
@@ -354,6 +388,43 @@ QVariantMap EkgController::getHRVTimeMetrics() const {
     metrics["hf"] = static_cast<double>(cached_hrv_metrics_.hf);
     metrics["lf_hf"] = static_cast<double>(cached_hrv_metrics_.lf_hf);
     return metrics;
+}
+
+QVariantMap EkgController::getHRVGeoMetrics() const {
+    QVariantMap metrics;
+    metrics["triangular_index"] = cached_hrv_geo_metrics_.triangular_index;
+    metrics["tinn"] = cached_hrv_geo_metrics_.tinn;
+    metrics["sd1"] = cached_hrv_geo_metrics_.sd1;
+    metrics["sd2"] = cached_hrv_geo_metrics_.sd2;
+    return metrics;
+}
+
+QVariantList EkgController::getHRVGeoHistogram() const {
+    QVariantList result;
+    const auto& hist = cached_hrv_geo_metrics_.histogram;
+    double binWidth = cached_hrv_geo_metrics_.bin_width;
+    double rrMin = cached_hrv_geo_metrics_.rr_min;
+
+    for (size_t i = 0; i < hist.size(); ++i) {
+        QVariantMap entry;
+        entry["x"] = rrMin + i * binWidth + binWidth / 2.0;
+        entry["y"] = hist[i];
+        result.append(entry);
+    }
+    return result;
+}
+
+QVariantList EkgController::getHRVGeoPoincare() const {
+    QVariantList result;
+    const auto& rr = cached_hrv_geo_metrics_.rr_intervals;
+
+    for (size_t i = 0; i + 1 < rr.size(); ++i) {
+        QVariantMap entry;
+        entry["x"] = rr[i];
+        entry["y"] = rr[i + 1];
+        result.append(entry);
+    }
+    return result;
 }
 
 int EkgController::channelCount() const {
