@@ -842,10 +842,12 @@ ApplicationWindow {
                                 selectedFilterMethod = -1
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
-                                chartRawSeries = ekgController.getRawSeries(selectedChannelIndex, maxPlottedPoints)
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
-                                applySeriesToChart()
+                                filteredSeriesLine.clear()
+                                peaksSeries.clear()
+                                filteredSeriesLine.visible = false
+                                peaksSeries.visible = false
                             } else if (window.currentModule === "R PEAKS") {
                                 ekgController.resetRPeaks()
                                 lastUsedRPeaksMethod = ""
@@ -853,7 +855,8 @@ ApplicationWindow {
                                 selectedRPeaksMethod = -1
                                 selectedHRVTimeMethod = -1
                                 chartRPeaksSeries = []
-                                applySeriesToChart()
+                                peaksSeries.clear()
+                                peaksSeries.visible = false
                             } else if (window.currentModule === "HRV TIME") {
                                 ekgController.resetHRVTime()
                                 lastUsedHRVTimeMethod = ""
@@ -862,7 +865,12 @@ ApplicationWindow {
                                 chartRawSeries = []
                                 chartFilteredSeries = []
                                 chartRPeaksSeries = []
-                                applySeriesToChart()
+                                rawSeriesLine.clear()
+                                filteredSeriesLine.clear()
+                                peaksSeries.clear()
+                                rawSeriesLine.visible = false
+                                filteredSeriesLine.visible = false
+                                peaksSeries.visible = false
                             }
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
