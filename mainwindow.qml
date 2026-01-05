@@ -36,6 +36,7 @@ ApplicationWindow {
     property int maxPlottedPoints: 4000
     property var channelOptions: []
     property bool chartLoading: false
+    property bool isProcessing: false
     property string pendingFileName: ""
     property string lastUsedFilter: ""
     property string lastUsedRPeaksMethod: ""
@@ -314,7 +315,7 @@ ApplicationWindow {
 
     property string currentModule: "ECG BASELINE"
     onCurrentModuleChanged: {
-        analysisStatus.isProcessing = false
+        window.isProcessing = false
         analysisProgress.value = 0
         updateMarkerVisibility()
         Qt.callLater(updateAnalysisCharts)
@@ -336,7 +337,7 @@ ApplicationWindow {
 
         function onFileLoadSuccess(filename) {
             analysisProgress.value = 0
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             lastUsedFilter = ""
             lastUsedRPeaksMethod = ""
             lastUsedHRVTimeMethod = ""
@@ -364,13 +365,13 @@ ApplicationWindow {
 
         function onFilteringSuccess(filterName) {
             lastUsedFilter = filterName
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             refreshVisualization()
         }
 
         function onFilteringError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             chartLoading = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
@@ -378,14 +379,14 @@ ApplicationWindow {
 
         function onRPeaksDetectionSuccess(methodName) {
             lastUsedRPeaksMethod = methodName
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             refreshVisualization()
         }
 
         function onBaselineCompletedChanged() {
             if (ekgController.baselineCompleted) {
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 refreshVisualization()
             }
@@ -393,14 +394,14 @@ ApplicationWindow {
 
         function onRPeaksCompletedChanged() {
             if (ekgController.rPeaksCompleted) {
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 refreshVisualization()
             }
         }
 
         function onRPeaksDetectionError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             chartLoading = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
@@ -408,20 +409,20 @@ ApplicationWindow {
 
         function onHrvTimeSuccess(methodName) {
             lastUsedHRVTimeMethod = methodName
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             Qt.callLater(updateAnalysisCharts)
         }
 
         function onHrvTimeError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
 
         function onHrvTimeCompletedChanged() {
             if (ekgController.hrvTimeCompleted) {
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 if (window.currentModule === "HRV TIME") {
                     Qt.callLater(updateAnalysisCharts)
@@ -431,20 +432,20 @@ ApplicationWindow {
 
         function onHrvGeoSuccess() {
             hrvGeoRan = true
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             Qt.callLater(updateAnalysisCharts)
         }
 
         function onHrvGeoError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
 
         function onHrvGeoCompletedChanged() {
             if (ekgController.hrvGeoCompleted) {
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 if (window.currentModule === "HRV GEO") {
                     Qt.callLater(updateAnalysisCharts)
@@ -454,20 +455,20 @@ ApplicationWindow {
 
         function onWavesSuccess() {
             wavesRan = true
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             refreshVisualization()
         }
 
         function onWavesError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
 
         function onWavesCompletedChanged() {
             if (ekgController.wavesCompleted) {
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 refreshVisualization()
             }
@@ -476,13 +477,13 @@ ApplicationWindow {
         function onHeartClassSuccess() {
             heartClassRan = true
             heartClassAnnotations = ekgController.getHeartClassAnnotations()
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 100
             Qt.callLater(updateAnalysisCharts)
         }
 
         function onHeartClassError(errorMessage) {
-            analysisStatus.isProcessing = false
+            window.isProcessing = false
             analysisProgress.value = 0
             showTemporaryStatus("✗ " + errorMessage, Material.Red)
         }
@@ -490,7 +491,7 @@ ApplicationWindow {
         function onHeartClassCompletedChanged() {
             if (ekgController.heartClassCompleted) {
                 heartClassAnnotations = ekgController.getHeartClassAnnotations()
-                analysisStatus.isProcessing = false
+                window.isProcessing = false
                 analysisProgress.value = 100
                 if (window.currentModule === "HEART CLASS") {
                     Qt.callLater(updateAnalysisCharts)
@@ -776,7 +777,7 @@ ApplicationWindow {
                 ComboBox {
                     id: moduleCombo
                     Layout.fillWidth: true
-                    enabled: !analysisStatus.isProcessing && !chartLoading
+                    enabled: !window.isProcessing && !chartLoading
                     model: [
                         "ECG BASELINE",
                         "R PEAKS",
@@ -1447,9 +1448,9 @@ ApplicationWindow {
 
                     Label {
                         id: analysisStatus
-                        property bool isProcessing: false
                         property string statusText: {
                             var module = window.currentModule
+                            var processing = window.isProcessing
                             var hasData = ekgController.hasData
                             var hasFiltered = ekgController.hasFilteredData
                             var baselineOK = ekgController.baselineCompleted
@@ -1459,7 +1460,7 @@ ApplicationWindow {
                             if (module === "ECG BASELINE") {
                                 if (!hasData) {
                                     return "Oczekiwanie na plik"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!baselineOK) {
                                     return "Gotowy"
@@ -1475,7 +1476,7 @@ ApplicationWindow {
                                     return "Oczekiwanie na plik"
                                 } else if (!hasFiltered) {
                                     return "Oczekiwanie na filtrowanie"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!rPeaksOK) {
                                     return "Gotowy"
@@ -1491,7 +1492,7 @@ ApplicationWindow {
                                     return "Oczekiwanie na plik"
                                 } else if (!rPeaksOK) {
                                     return "Oczekiwanie na detekcje R"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!hrvTimeOK) {
                                     return "Gotowy"
@@ -1508,7 +1509,7 @@ ApplicationWindow {
                                     return "Oczekiwanie na plik"
                                 } else if (!rPeaksOK) {
                                     return "Oczekiwanie na detekcje R"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!hrvGeoOK) {
                                     return "Gotowy"
@@ -1521,7 +1522,7 @@ ApplicationWindow {
                                     return "Oczekiwanie na plik"
                                 } else if (!hasFiltered) {
                                     return "Oczekiwanie na filtrowanie"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!wavesOK) {
                                     return "Gotowy"
@@ -1534,7 +1535,7 @@ ApplicationWindow {
                                     return "Oczekiwanie na plik"
                                 } else if (!hasFiltered) {
                                     return "Oczekiwanie na filtrowanie"
-                                } else if (isProcessing) {
+                                } else if (processing) {
                                     return "Przetwarzanie..."
                                 } else if (!heartClassOK) {
                                     return "Gotowy"
@@ -1547,6 +1548,7 @@ ApplicationWindow {
                         }
                         text: statusText
                         property color statusColor: {
+                            var processing = window.isProcessing
                             var module = window.currentModule
                             var hasData = ekgController.hasData
                             var hasFiltered = ekgController.hasFilteredData
@@ -1556,40 +1558,40 @@ ApplicationWindow {
 
                             if (module === "ECG BASELINE") {
                                 if (!hasData) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!baselineOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "R PEAKS") {
                                 if (!hasData) return textSecondary
                                 if (!hasFiltered) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!rPeaksOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "HRV TIME") {
                                 if (!hasData) return textSecondary
                                 if (!rPeaksOK) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!hrvTimeOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "HRV GEO") {
                                 var hrvGeoOK = ekgController.hrvGeoCompleted
                                 if (!hasData) return textSecondary
                                 if (!rPeaksOK) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!hrvGeoOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "WAVES") {
                                 var wavesOK = ekgController.wavesCompleted
                                 if (!hasData) return textSecondary
                                 if (!hasFiltered) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!wavesOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             } else if (module === "HEART CLASS") {
                                 var heartClassOK = ekgController.heartClassCompleted
                                 if (!hasData) return textSecondary
                                 if (!hasFiltered) return textSecondary
-                                if (isProcessing) return Material.color(Material.Orange)
+                                if (processing) return Material.color(Material.Orange)
                                 if (!heartClassOK) return Material.color(Material.Teal)
                                 return Material.color(Material.Green)
                             }
@@ -1609,8 +1611,8 @@ ApplicationWindow {
                         id: analysisProgress
                         from: 0
                         to: 100
-                        value: analysisStatus.isProcessing ? 0 : 100
-                        indeterminate: analysisStatus.isProcessing
+                        value: window.isProcessing ? 0 : 100
+                        indeterminate: window.isProcessing
                         Layout.fillWidth: true
                     }
                 }
@@ -1685,10 +1687,15 @@ ApplicationWindow {
                         ToolTip.delay: 500
 
                         onClicked: {
-                            analysisStatus.isProcessing = true
-                            analysisProgress.value = 0
-                            
-                            Qt.callLater(function() {
+                            window.isProcessing = true
+                            analysisDelayTimer.start()
+                        }
+                        
+                        Timer {
+                            id: analysisDelayTimer
+                            interval: 50
+                            repeat: false
+                            onTriggered: {
                                 if (window.currentModule === "ECG BASELINE") {
                                     if (paramsLoader.item && paramsLoader.item.runFiltering) {
                                         paramsLoader.item.runFiltering()
@@ -1714,7 +1721,7 @@ ApplicationWindow {
                                         paramsLoader.item.runHeartClass()
                                     }
                                 }
-                            })
+                            }
                         }
                     }
 
@@ -1723,7 +1730,7 @@ ApplicationWindow {
                         text: "Reset"
                         Layout.preferredWidth: 100
                         onClicked: {
-                            analysisStatus.isProcessing = false
+                            window.isProcessing = false
                             statusResetTimer.stop()
                             analysisProgress.value = 0
                             if (window.currentModule === "ECG BASELINE") {
@@ -1847,7 +1854,7 @@ ApplicationWindow {
 
             function runFiltering() {
                 if (!filterGroup.checkedButton) {
-                    analysisStatus.isProcessing = false
+                    window.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz filtr", Material.Orange)
                     return
                 }
@@ -1924,7 +1931,7 @@ ApplicationWindow {
 
             function runDetection() {
                 if (!detectionMethodGroup.checkedButton) {
-                    analysisStatus.isProcessing = false
+                    window.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz metode detekcji", Material.Orange)
                     return
                 }
@@ -2001,7 +2008,7 @@ ApplicationWindow {
 
             function runHRVTime() {
                 if (!spectralMethodGroup.checkedButton) {
-                    analysisStatus.isProcessing = false
+                    window.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz metode estymacji", Material.Orange)
                     return
                 }
