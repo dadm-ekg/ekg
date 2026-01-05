@@ -659,7 +659,7 @@ ApplicationWindow {
     RowLayout {
         anchors.fill: parent
         anchors.margins: 16
-        anchors.topMargin: header.height + 16
+        anchors.topMargin: header.height
         spacing: 16
 
         Frame {
