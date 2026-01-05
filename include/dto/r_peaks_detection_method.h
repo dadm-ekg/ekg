@@ -1,9 +1,9 @@
 #ifndef EKG_R_PEAKS_DETECTION_METHOD_H
 #define EKG_R_PEAKS_DETECTION_METHOD_H
 
-enum class RPeaksDetectionMethod {
-    PanTompkins,
-    Hilbert,
-    Wavelet
+enum RPeaksDetectionMethod {
+    PanTompkins = 0,
+    Hilbert = 1,
+    Wavelet = 2
 };
 #endif //EKG_R_PEAKS_DETECTION_METHOD_H

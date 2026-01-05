@@ -1,4 +1,5 @@
 #include "../../include/bridge/ekg_controller.h"
+#include "../../include/bridge/analysis_worker.h"
 #include "../../include/dto/r_peaks_detection_method.h"
 #include "../../include/dto/file_format.h"
 #include "../../include/repository/results_repository.h"
@@ -16,6 +17,98 @@
 
 EkgController::EkgController(std::shared_ptr<IApplicationService> application_service, std::shared_ptr<IResultsRepository> results_repository, QObject *parent)
     : QObject(parent), application_service_(std::move(application_service)), results_repository_(std::move(results_repository)) {
+    setupAnalysisWorker();
+}
+
+void EkgController::setupAnalysisWorker() {
+    analysis_thread_ = new QThread(this);
+    analysis_worker_ = new AnalysisWorker(application_service_);
+    analysis_worker_->moveToThread(analysis_thread_);
+    
+    connect(analysis_thread_, &QThread::finished, analysis_worker_, &QObject::deleteLater);
+    connect(analysis_worker_, &AnalysisWorker::baselineCompleted, this, [this](bool success, QString filterName, QString errorMessage) {
+        if (success) {
+            baseline_completed_ = true;
+            r_peaks_completed_ = false;
+            hrv_time_completed_ = false;
+            hrv_geo_completed_ = false;
+            waves_completed_ = false;
+            heart_class_completed_ = false;
+            emit hasFilteredDataChanged();
+            emit baselineCompletedChanged();
+            emit rPeaksCompletedChanged();
+            emit hrvTimeCompletedChanged();
+            emit hrvGeoCompletedChanged();
+            emit wavesCompletedChanged();
+            emit heartClassCompletedChanged();
+            emit filteringSuccess(filterName);
+        } else {
+            emit filteringError(errorMessage);
+        }
+    });
+    
+    connect(analysis_worker_, &AnalysisWorker::rPeaksDetectionCompleted, this, [this](bool success, QString methodName, QString errorMessage) {
+        if (success) {
+            r_peaks_completed_ = true;
+            hrv_time_completed_ = false;
+            hrv_geo_completed_ = false;
+            waves_completed_ = false;
+            heart_class_completed_ = false;
+            emit rPeaksCompletedChanged();
+            emit hrvTimeCompletedChanged();
+            emit hrvGeoCompletedChanged();
+            emit wavesCompletedChanged();
+            emit heartClassCompletedChanged();
+            emit rPeaksDetectionSuccess(methodName);
+        } else {
+            emit rPeaksDetectionError(errorMessage);
+        }
+    });
+    
+    connect(analysis_worker_, &AnalysisWorker::hrvTimeCompleted, this, [this](bool success, QString methodName, HRVTimeMetrics metrics, QString errorMessage) {
+        if (success) {
+            cached_hrv_metrics_ = metrics;
+            hrv_time_completed_ = true;
+            emit hrvTimeCompletedChanged();
+            emit hrvTimeSuccess(methodName);
+        } else {
+            emit hrvTimeError(errorMessage);
+        }
+    });
+    
+    connect(analysis_worker_, &AnalysisWorker::hrvGeoCompleted, this, [this](bool success, HRVGeoMetrics metrics, QString errorMessage) {
+        if (success) {
+            cached_hrv_geo_metrics_ = metrics;
+            hrv_geo_completed_ = true;
+            emit hrvGeoCompletedChanged();
+            emit hrvGeoSuccess();
+        } else {
+            emit hrvGeoError(errorMessage);
+        }
+    });
+    
+    connect(analysis_worker_, &AnalysisWorker::wavesCompleted, this, [this](bool success, QString errorMessage) {
+        if (success) {
+            waves_completed_ = true;
+            emit wavesCompletedChanged();
+            emit wavesSuccess();
+        } else {
+            emit wavesError(errorMessage);
+        }
+    });
+    
+    connect(analysis_worker_, &AnalysisWorker::heartClassCompleted, this, [this](bool success, HeartClassResult result, QString errorMessage) {
+        if (success) {
+            cached_heart_class_result_ = result;
+            heart_class_completed_ = true;
+            emit heartClassCompletedChanged();
+            emit heartClassSuccess();
+        } else {
+            emit heartClassError(errorMessage);
+        }
+    });
+    
+    analysis_thread_->start();
 }
 
 void EkgController::loadData(const QString &filename) {
@@ -79,46 +172,24 @@ bool EkgController::runBaseline(int filterMethod) {
         return false;
     }
 
-    QString filterName;
-    bool success = false;
-
+    FilterMethod method;
     switch (filterMethod) {
-        case FilterMethod::MovingAverage:
-            filterName = "Moving Average";
-            success = application_service_->RunFiltering(::MovingAverage);
+        case 0:
+            method = MovingAverage;
             break;
-        case FilterMethod::Butterworth:
-            filterName = "Butterworth";
-            success = application_service_->RunFiltering(::Butterworth);
+        case 1:
+            method = Butterworth;
             break;
-        case FilterMethod::SavitzkyGolay:
-            emit filteringError("Filtr Savitzky-Golay nie jest jeszcze zaimplementowany");
-            return false;
+        case 2:
+            method = SavitzkyGolay;
+            break;
         default:
             emit filteringError("Nieznany typ filtra");
             return false;
     }
 
-    if (success) {
-        baseline_completed_ = true;
-        r_peaks_completed_ = false;
-        hrv_time_completed_ = false;
-        hrv_geo_completed_ = false;
-        waves_completed_ = false;
-        heart_class_completed_ = false;
-        emit hasFilteredDataChanged();
-        emit baselineCompletedChanged();
-        emit rPeaksCompletedChanged();
-        emit hrvTimeCompletedChanged();
-        emit hrvGeoCompletedChanged();
-        emit wavesCompletedChanged();
-        emit heartClassCompletedChanged();
-        emit filteringSuccess(filterName);
-    } else {
-        emit filteringError("Nie udało się zastosować filtra " + filterName);
-    }
-
-    return success;
+    QMetaObject::invokeMethod(analysis_worker_, "runBaseline", Qt::QueuedConnection, Q_ARG(FilterMethod, method));
+    return true;
 }
 
 bool EkgController::runRPeaksDetection(int method) {
@@ -127,46 +198,24 @@ bool EkgController::runRPeaksDetection(int method) {
         return false;
     }
 
-    QString methodName;
     RPeaksDetectionMethod rPeaksMethod;
-
     switch (method) {
-        case RPeaksMethod::PanTompkins:
-            methodName = "Pan-Tompkins";
-            rPeaksMethod = RPeaksDetectionMethod::PanTompkins;
+        case 0:
+            rPeaksMethod = PanTompkins;
             break;
-        case RPeaksMethod::Hilbert:
-            methodName = "Transformata Hilberta";
-            rPeaksMethod = RPeaksDetectionMethod::Hilbert;
+        case 1:
+            rPeaksMethod = Hilbert;
             break;
-        case RPeaksMethod::Wavelet:
-            methodName = "Falkowa (Wavelet)";
-            rPeaksMethod = RPeaksDetectionMethod::Wavelet;
+        case 2:
+            rPeaksMethod = Wavelet;
             break;
         default:
             emit rPeaksDetectionError("Nieznana metoda detekcji");
             return false;
     }
 
-    bool success = application_service_->CalculateRPeaks(rPeaksMethod);
-
-    if (success) {
-        r_peaks_completed_ = true;
-        hrv_time_completed_ = false;
-        hrv_geo_completed_ = false;
-        waves_completed_ = false;
-        heart_class_completed_ = false;
-        emit rPeaksCompletedChanged();
-        emit hrvTimeCompletedChanged();
-        emit hrvGeoCompletedChanged();
-        emit wavesCompletedChanged();
-        emit heartClassCompletedChanged();
-        emit rPeaksDetectionSuccess(methodName);
-    } else {
-        emit rPeaksDetectionError("Nie udało się wykryć pików R metodą " + methodName);
-    }
-
-    return success;
+    QMetaObject::invokeMethod(analysis_worker_, "runRPeaksDetection", Qt::QueuedConnection, Q_ARG(RPeaksDetectionMethod, rPeaksMethod));
+    return true;
 }
 
 bool EkgController::runHRVTime(int method) {
@@ -175,32 +224,23 @@ bool EkgController::runHRVTime(int method) {
         return false;
     }
 
-    QString methodName;
-    HRVTimeMetrics::SpectralMethod spectralMethod;
-
+    HRVSpectralMethod spectralMethod;
     switch (method) {
-        case HRVSpectralMethod::ClassicPeriodogram:
-            methodName = "Klasyczny periodogram";
-            spectralMethod = HRVTimeMetrics::SpectralMethod::CLASSIC_PERIODOGRAM;
+        case 0:
+            spectralMethod = ClassicPeriodogram;
             break;
-        case HRVSpectralMethod::LombScargle:
-            methodName = "Lomb-Scargle";
-            spectralMethod = HRVTimeMetrics::SpectralMethod::LOMB_SCARGLE;
+        case 1:
+            spectralMethod = LombScargle;
             break;
-        case HRVSpectralMethod::Welch:
-            methodName = "Welch";
-            spectralMethod = HRVTimeMetrics::SpectralMethod::WELCH;
+        case 2:
+            spectralMethod = Welch;
             break;
         default:
             emit hrvTimeError("Nieznana metoda estymacji widma");
             return false;
     }
 
-    cached_hrv_metrics_ = application_service_->CalculateHRVTime(spectralMethod);
-    hrv_time_completed_ = true;
-    emit hrvTimeCompletedChanged();
-    emit hrvTimeSuccess(methodName);
-
+    QMetaObject::invokeMethod(analysis_worker_, "runHRVTime", Qt::QueuedConnection, Q_ARG(HRVSpectralMethod, spectralMethod));
     return true;
 }
 
@@ -210,11 +250,7 @@ bool EkgController::runHRVGeo() {
         return false;
     }
 
-    cached_hrv_geo_metrics_ = application_service_->CalculateHRVGeo();
-    hrv_geo_completed_ = true;
-    emit hrvGeoCompletedChanged();
-    emit hrvGeoSuccess();
-
+    QMetaObject::invokeMethod(analysis_worker_, "runHRVGeo", Qt::QueuedConnection);
     return true;
 }
 
@@ -224,17 +260,8 @@ bool EkgController::runWaves() {
         return false;
     }
 
-    bool success = application_service_->CalculateWaves();
-
-    if (success) {
-        waves_completed_ = true;
-        emit wavesCompletedChanged();
-        emit wavesSuccess();
-    } else {
-        emit wavesError("Nie udało się wykryć fal EKG");
-    }
-
-    return success;
+    QMetaObject::invokeMethod(analysis_worker_, "runWaves", Qt::QueuedConnection);
+    return true;
 }
 
 QString EkgController::loadedFilename() const {
@@ -306,11 +333,7 @@ bool EkgController::runHeartClass() {
         return false;
     }
 
-    cached_heart_class_result_ = application_service_->CalculateHeartClass();
-    heart_class_completed_ = true;
-    emit heartClassCompletedChanged();
-    emit heartClassSuccess();
-
+    QMetaObject::invokeMethod(analysis_worker_, "runHeartClass", Qt::QueuedConnection);
     return true;
 }
 

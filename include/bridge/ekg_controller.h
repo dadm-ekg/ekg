@@ -5,9 +5,15 @@
 #include <QString>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QThread>
 #include <memory>
 #include "../service/abstract/application_service.h"
 #include "../repository/abstract/results_repository.h"
+#include "../dto/filter_method.h"
+#include "../dto/r_peaks_detection_method.h"
+#include "../dto/hrv_spectral_method.h"
+
+class AnalysisWorker;
 
 class EkgController : public QObject {
     Q_OBJECT
@@ -23,25 +29,8 @@ class EkgController : public QObject {
     Q_PROPERTY(bool heartClassCompleted READ heartClassCompleted NOTIFY heartClassCompletedChanged)
 
 public:
-    enum FilterMethod {
-        MovingAverage = 0,
-        Butterworth = 1,
-        SavitzkyGolay = 2
-    };
     Q_ENUM(FilterMethod)
-
-    enum RPeaksMethod {
-        PanTompkins = 0,
-        Hilbert = 1,
-        Wavelet = 2
-    };
-    Q_ENUM(RPeaksMethod)
-
-    enum HRVSpectralMethod {
-        ClassicPeriodogram = 0,
-        LombScargle = 1,
-        Welch = 2
-    };
+    Q_ENUM(RPeaksDetectionMethod)
     Q_ENUM(HRVSpectralMethod)
 
     explicit EkgController(std::shared_ptr<IApplicationService> application_service, std::shared_ptr<IResultsRepository> results_repository, QObject *parent = nullptr);
@@ -123,6 +112,8 @@ signals:
 private:
     std::shared_ptr<IApplicationService> application_service_;
     std::shared_ptr<IResultsRepository> results_repository_;
+    QThread* analysis_thread_;
+    AnalysisWorker* analysis_worker_;
     bool baseline_completed_ = false;
     bool r_peaks_completed_ = false;
     bool hrv_time_completed_ = false;
@@ -132,6 +123,8 @@ private:
     HRVTimeMetrics cached_hrv_metrics_;
     HRVGeoMetrics cached_hrv_geo_metrics_;
     HeartClassResult cached_heart_class_result_;
+    
+    void setupAnalysisWorker();
 };
 
 #endif

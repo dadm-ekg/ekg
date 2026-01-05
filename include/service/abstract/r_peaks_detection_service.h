@@ -13,7 +13,7 @@ public:
     virtual std::vector<RPeaksAnnotatedSignalDatapoint> Detect(const std::vector<SignalDatapoint> &datapoints,
                                                                int frequency,
                                                                RPeaksDetectionMethod method =
-                                                                       RPeaksDetectionMethod::PanTompkins) =
+                                                                       PanTompkins) =
     0;
 };
 

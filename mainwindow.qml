@@ -336,6 +336,7 @@ ApplicationWindow {
 
         function onFileLoadSuccess(filename) {
             analysisProgress.value = 0
+            analysisStatus.isProcessing = false
             lastUsedFilter = ""
             lastUsedRPeaksMethod = ""
             lastUsedHRVTimeMethod = ""
@@ -347,8 +348,12 @@ ApplicationWindow {
             heartClassRan = false
             chartWaveMarkers = {}
             heartClassAnnotations = []
+            chartRawSeries = []
+            chartFilteredSeries = []
+            chartRPeaksSeries = []
             chartScrollPosition = 0
             chartWindowSize = 10.0
+            moduleCombo.currentIndex = 0
             rebuildChannelOptions()
             refreshVisualization()
         }
@@ -1604,7 +1609,8 @@ ApplicationWindow {
                         id: analysisProgress
                         from: 0
                         to: 100
-                        value: 0
+                        value: analysisStatus.isProcessing ? 0 : 100
+                        indeterminate: analysisStatus.isProcessing
                         Layout.fillWidth: true
                     }
                 }
@@ -1679,31 +1685,36 @@ ApplicationWindow {
                         ToolTip.delay: 500
 
                         onClicked: {
-                            if (window.currentModule === "ECG BASELINE") {
-                                if (paramsLoader.item && paramsLoader.item.runFiltering) {
-                                    paramsLoader.item.runFiltering()
+                            analysisStatus.isProcessing = true
+                            analysisProgress.value = 0
+                            
+                            Qt.callLater(function() {
+                                if (window.currentModule === "ECG BASELINE") {
+                                    if (paramsLoader.item && paramsLoader.item.runFiltering) {
+                                        paramsLoader.item.runFiltering()
+                                    }
+                                } else if (window.currentModule === "R PEAKS") {
+                                    if (paramsLoader.item && paramsLoader.item.runDetection) {
+                                        paramsLoader.item.runDetection()
+                                    }
+                                } else if (window.currentModule === "HRV TIME") {
+                                    if (paramsLoader.item && paramsLoader.item.runHRVTime) {
+                                        paramsLoader.item.runHRVTime()
+                                    }
+                                } else if (window.currentModule === "HRV GEO") {
+                                    if (paramsLoader.item && paramsLoader.item.runHRVGeo) {
+                                        paramsLoader.item.runHRVGeo()
+                                    }
+                                } else if (window.currentModule === "WAVES") {
+                                    if (paramsLoader.item && paramsLoader.item.runWaves) {
+                                        paramsLoader.item.runWaves()
+                                    }
+                                } else if (window.currentModule === "HEART CLASS") {
+                                    if (paramsLoader.item && paramsLoader.item.runHeartClass) {
+                                        paramsLoader.item.runHeartClass()
+                                    }
                                 }
-                            } else if (window.currentModule === "R PEAKS") {
-                                if (paramsLoader.item && paramsLoader.item.runDetection) {
-                                    paramsLoader.item.runDetection()
-                                }
-                            } else if (window.currentModule === "HRV TIME") {
-                                if (paramsLoader.item && paramsLoader.item.runHRVTime) {
-                                    paramsLoader.item.runHRVTime()
-                                }
-                            } else if (window.currentModule === "HRV GEO") {
-                                if (paramsLoader.item && paramsLoader.item.runHRVGeo) {
-                                    paramsLoader.item.runHRVGeo()
-                                }
-                            } else if (window.currentModule === "WAVES") {
-                                if (paramsLoader.item && paramsLoader.item.runWaves) {
-                                    paramsLoader.item.runWaves()
-                                }
-                            } else if (window.currentModule === "HEART CLASS") {
-                                if (paramsLoader.item && paramsLoader.item.runHeartClass) {
-                                    paramsLoader.item.runHeartClass()
-                                }
-                            }
+                            })
                         }
                     }
 
@@ -1836,13 +1847,12 @@ ApplicationWindow {
 
             function runFiltering() {
                 if (!filterGroup.checkedButton) {
+                    analysisStatus.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz filtr", Material.Orange)
                     return
                 }
 
-                analysisStatus.isProcessing = true
                 chartLoading = true
-                analysisProgress.value = 0
 
                 if (rbMovingAverage.checked) {
                     window.selectedFilterMethod = 0
@@ -1914,13 +1924,12 @@ ApplicationWindow {
 
             function runDetection() {
                 if (!detectionMethodGroup.checkedButton) {
+                    analysisStatus.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz metode detekcji", Material.Orange)
                     return
                 }
 
-                analysisStatus.isProcessing = true
                 chartLoading = true
-                analysisProgress.value = 0
 
                 if (rbPanTompkins.checked) {
                     window.selectedRPeaksMethod = 0
@@ -1992,12 +2001,10 @@ ApplicationWindow {
 
             function runHRVTime() {
                 if (!spectralMethodGroup.checkedButton) {
+                    analysisStatus.isProcessing = false
                     showTemporaryStatus("⚠ Wybierz metode estymacji", Material.Orange)
                     return
                 }
-
-                analysisStatus.isProcessing = true
-                analysisProgress.value = 0
 
                 if (rbClassicPeriodogram.checked) {
                     window.selectedHRVTimeMethod = 0
@@ -2172,8 +2179,6 @@ ApplicationWindow {
             }
 
             function runHRVGeo() {
-                analysisStatus.isProcessing = true
-                analysisProgress.value = 0
                 ekgController.runHRVGeo()
             }
 
@@ -2259,9 +2264,7 @@ ApplicationWindow {
             }
 
             function runWaves() {
-                analysisStatus.isProcessing = true
                 chartLoading = true
-                analysisProgress.value = 0
                 ekgController.runWaves()
             }
 
@@ -2410,8 +2413,6 @@ ApplicationWindow {
             }
 
             function runHeartClass() {
-                analysisStatus.isProcessing = true
-                analysisProgress.value = 0
                 ekgController.runHeartClass()
             }
 
