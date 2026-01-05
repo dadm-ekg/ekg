@@ -11,7 +11,7 @@ HRVGeoMetrics HRVGeoProcessingService::Process(const std::vector<RPeaksAnnotated
     std::vector<int> r_peak_indices;
     
     for (size_t i = 0; i < datapoints.size(); ++i) {
-        if (datapoints[i].peak) {
+        if (!datapoints[i].peaks.empty() && datapoints[i].peaks[0]) {
             r_peak_indices.push_back(i);
         }
     }

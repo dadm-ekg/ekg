@@ -6,6 +6,7 @@
 #include "include/bridge/ekg_controller.h"
 #include "include/service/application_service.h"
 #include "include/repository/dat_signal_repository.h"
+#include "include/repository/results_repository.h"
 #include "include/service/butterworth_filter_service.h"
 #include "include/service/moving_average_filter_service.h"
 #include "include/service/r_peaks_detection_service.h"
@@ -38,7 +39,8 @@ int main(int argc, char *argv[])
         heart_class_detection_service
     );
 
-    auto ekg_controller = new EkgController(application_service);
+    auto results_repository = std::make_shared<ResultsRepository>();
+    auto ekg_controller = new EkgController(application_service, results_repository);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("ekgController", ekg_controller);

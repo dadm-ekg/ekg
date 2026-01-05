@@ -13,8 +13,8 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Quick Charts)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Quick Charts)
 
 file(GLOB_RECURSE PROJECT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/*.cpp
-        ${PROJECT_SOURCE_DIR}/src/*.h
+        ${PROJECT_SOURCE_DIR}/src/**/*.cpp
+        ${PROJECT_SOURCE_DIR}/src/**/*.h
         ${PROJECT_SOURCE_DIR}/include/**/*.h
         ${PROJECT_SOURCE_DIR}/main.cpp
         ${PROJECT_SOURCE_DIR}/root.cpp

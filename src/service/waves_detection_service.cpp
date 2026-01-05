@@ -199,6 +199,12 @@ std::vector<WaveAnnotatedSignalDatapoint> WavesDetectionService::Detect(const st
     if (datapoints.empty()) {
         return {};
     }
+    for (const auto& dp : datapoints) {
+        if (dp.channelValues.empty()) return {};
+    }
+
+    const size_t num_channels = datapoints[0].channelValues.size();
+    if (num_channels == 0) return {};
 
     ButterworthFilterService butterworthFilter;
     MovingAverageFilterService movingAvgFilter;
@@ -206,126 +212,133 @@ std::vector<WaveAnnotatedSignalDatapoint> WavesDetectionService::Detect(const st
     auto filteredPoints = butterworthFilter.Filter(datapoints);
     auto smoothedPoints = movingAvgFilter.Filter(filteredPoints);
 
-    std::vector<double> signal;
-    std::vector<double> sig_smooth;
-    signal.reserve(filteredPoints.size());
-    sig_smooth.reserve(smoothedPoints.size());
-
-    size_t channelIdx = 0;
-    if (!filteredPoints.empty() && filteredPoints[0].channelValues.size() > 1) channelIdx = 1;
-
-    for (const auto &p: filteredPoints) {
-        if (p.channelValues.size() > channelIdx) signal.push_back(p.channelValues[channelIdx]);
-        else signal.push_back(0.0);
-    }
-    for (const auto &p: smoothedPoints) {
-        if (p.channelValues.size() > channelIdx) sig_smooth.push_back(p.channelValues[channelIdx]);
-        else sig_smooth.push_back(0.0);
-    }
-
-    std::vector<int> r_peaks;
-    {
-        double max_val = -1e9;
-        for (double v: signal) if (v > max_val) max_val = v;
-        double threshold = max_val * 0.5;
-        int min_dist = (int) (0.6 * frequency);
-        int last_r = -min_dist;
-
-        for (size_t i = 1; i < signal.size() - 1; ++i) {
-            if (signal[i] > threshold && signal[i] > signal[i - 1] && signal[i] > signal[i + 1]) {
-                if ((int) i - last_r > min_dist) {
-                    int win = std::max(1, frequency / 50);
-                    int start = std::max(0, (int) i - win);
-                    int end = std::min((int) signal.size(), (int) i + win);
-                    int real_r = i;
-                    double local_max = -1e9;
-                    for (int k = start; k < end; ++k) {
-                        if (signal[k] > local_max) {
-                            local_max = signal[k];
-                            real_r = k;
-                        }
-                    }
-                    r_peaks.push_back(real_r);
-                    last_r = real_r;
-                }
-            }
-        }
-    }
-
-    std::vector<BeatIndices> beats(r_peaks.size());
-    std::vector<int> p_onsets(r_peaks.size(), 0);
-
-    int win_qs = static_cast<int>(0.06 * frequency);
-    int win_tan = static_cast<int>(0.03 * frequency);
-    int win_p_look = static_cast<int>(0.24 * frequency);
-
-    for (size_t i = 0; i < r_peaks.size(); ++i) {
-        int r = r_peaks[i];
-        beats[i].r = r;
-
-        int bl_start = std::max(0, r - static_cast<int>(0.10 * frequency));
-        int bl_end = std::max(0, r - static_cast<int>(0.04 * frequency));
-        double baseline = GetMean(signal, bl_start, bl_end);
-
-        int q_min = FindMinIndex(signal, std::max(0, r - win_qs), r);
-        beats[i].qrs_on = GetTangentPoint(signal, q_min, win_tan, baseline, -1);
-        if (beats[i].qrs_on > q_min) beats[i].qrs_on = q_min - 2;
-
-        int s_min = FindMinIndex(signal, r, std::min((int) signal.size(), r + win_qs));
-        beats[i].qrs_end = GetTangentPoint(signal, s_min, win_tan, baseline, 1);
-        if (beats[i].qrs_end < s_min) beats[i].qrs_end = s_min + 2;
-
-        int p_search_end = beats[i].qrs_on - static_cast<int>(0.02 * frequency);
-        int p_search_start = std::max(0, beats[i].qrs_on - win_p_look);
-        AnalyzePWave(sig_smooth, p_search_start, p_search_end, baseline, beats[i].p_on, beats[i].p_end);
-
-        p_onsets[i] = beats[i].p_on;
-    }
-
-    for (size_t i = 0; i < r_peaks.size(); ++i) {
-        int s_point = beats[i].qrs_end;
-        int limit;
-        if (i < r_peaks.size() - 1) {
-            limit = std::max(s_point + 10, p_onsets[i + 1] - static_cast<int>(0.02 * frequency));
-        } else {
-            limit = std::min((int) signal.size() - 1, s_point + static_cast<int>(0.5 * frequency));
-        }
-
-        int bl_start = std::max(0, beats[i].r - static_cast<int>(0.10 * frequency));
-        int bl_end = std::max(0, beats[i].r - static_cast<int>(0.04 * frequency));
-        double baseline = GetMean(signal, bl_start, bl_end);
-
-        beats[i].t_end = CalculateTEndIntersection(signal, sig_smooth, s_point, limit, baseline, frequency);
-    }
-
     std::vector<WaveAnnotatedSignalDatapoint> result;
     result.reserve(datapoints.size());
 
-    std::vector<int> p_on_map(signal.size(), 0);
-    std::vector<int> p_end_map(signal.size(), 0);
-    std::vector<int> qrs_on_map(signal.size(), 0);
-    std::vector<int> qrs_end_map(signal.size(), 0);
-    std::vector<int> t_end_map(signal.size(), 0);
-
-    for (const auto &b: beats) {
-        if (b.p_on >= 0) p_on_map[b.p_on] = 1;
-        if (b.p_end >= 0) p_end_map[b.p_end] = 1;
-        if (b.qrs_on >= 0) qrs_on_map[b.qrs_on] = 1;
-        if (b.qrs_end >= 0) qrs_end_map[b.qrs_end] = 1;
-        if (b.t_end >= 0) t_end_map[b.t_end] = 1;
-    }
-
+    // Initialize result with channel values
     for (size_t i = 0; i < datapoints.size(); ++i) {
         WaveAnnotatedSignalDatapoint wp;
         wp.channelValues = datapoints[i].channelValues;
-
-        if (p_on_map[i]) wp.p_wave_onset = true;
-        if (p_end_map[i]) wp.p_wave_end = true;
-        if (qrs_on_map[i]) wp.qrs_onset = true;
-        if (qrs_end_map[i]) wp.qrs_end = true;
-        if (t_end_map[i]) wp.t_end = true;
-
+        wp.p_wave_onset.resize(num_channels, false);
+        wp.p_wave_end.resize(num_channels, false);
+        wp.qrs_onset.resize(num_channels, false);
+        wp.qrs_end.resize(num_channels, false);
+        wp.t_end.resize(num_channels, false);
         result.push_back(wp);
+    }
+
+    // Analyze each channel separately
+    for (size_t ch = 0; ch < num_channels; ++ch) {
+        std::vector<double> signal;
+        std::vector<double> sig_smooth;
+        signal.reserve(filteredPoints.size());
+        sig_smooth.reserve(smoothedPoints.size());
+
+        for (const auto &p: filteredPoints) {
+            if (p.channelValues.size() > ch) signal.push_back(p.channelValues[ch]);
+            else signal.push_back(0.0);
+        }
+        for (const auto &p: smoothedPoints) {
+            if (p.channelValues.size() > ch) sig_smooth.push_back(p.channelValues[ch]);
+            else sig_smooth.push_back(0.0);
+        }
+
+        std::vector<int> r_peaks;
+        {
+            double max_val = -1e9;
+            for (double v: signal) if (v > max_val) max_val = v;
+            double threshold = max_val * 0.5;
+            int min_dist = (int) (0.6 * frequency);
+            int last_r = -min_dist;
+
+            for (size_t i = 1; i < signal.size() - 1; ++i) {
+                if (signal[i] > threshold && signal[i] > signal[i - 1] && signal[i] > signal[i + 1]) {
+                    if ((int) i - last_r > min_dist) {
+                        int win = std::max(1, frequency / 50);
+                        int start = std::max(0, (int) i - win);
+                        int end = std::min((int) signal.size(), (int) i + win);
+                        int real_r = i;
+                        double local_max = -1e9;
+                        for (int k = start; k < end; ++k) {
+                            if (signal[k] > local_max) {
+                                local_max = signal[k];
+                                real_r = k;
+                            }
+                        }
+                        r_peaks.push_back(real_r);
+                        last_r = real_r;
+                    }
+                }
+            }
+        }
+
+        std::vector<BeatIndices> beats(r_peaks.size());
+        std::vector<int> p_onsets(r_peaks.size(), 0);
+
+        int win_qs = static_cast<int>(0.06 * frequency);
+        int win_tan = static_cast<int>(0.03 * frequency);
+        int win_p_look = static_cast<int>(0.24 * frequency);
+
+        for (size_t i = 0; i < r_peaks.size(); ++i) {
+            int r = r_peaks[i];
+            beats[i].r = r;
+
+            int bl_start = std::max(0, r - static_cast<int>(0.10 * frequency));
+            int bl_end = std::max(0, r - static_cast<int>(0.04 * frequency));
+            double baseline = GetMean(signal, bl_start, bl_end);
+
+            int q_min = FindMinIndex(signal, std::max(0, r - win_qs), r);
+            beats[i].qrs_on = GetTangentPoint(signal, q_min, win_tan, baseline, -1);
+            if (beats[i].qrs_on > q_min) beats[i].qrs_on = q_min - 2;
+
+            int s_min = FindMinIndex(signal, r, std::min((int) signal.size(), r + win_qs));
+            beats[i].qrs_end = GetTangentPoint(signal, s_min, win_tan, baseline, 1);
+            if (beats[i].qrs_end < s_min) beats[i].qrs_end = s_min + 2;
+
+            int p_search_end = beats[i].qrs_on - static_cast<int>(0.02 * frequency);
+            int p_search_start = std::max(0, beats[i].qrs_on - win_p_look);
+            AnalyzePWave(sig_smooth, p_search_start, p_search_end, baseline, beats[i].p_on, beats[i].p_end);
+
+            p_onsets[i] = beats[i].p_on;
+        }
+
+        for (size_t i = 0; i < r_peaks.size(); ++i) {
+            int s_point = beats[i].qrs_end;
+            int limit;
+            if (i < r_peaks.size() - 1) {
+                limit = std::max(s_point + 10, p_onsets[i + 1] - static_cast<int>(0.02 * frequency));
+            } else {
+                limit = std::min((int) signal.size() - 1, s_point + static_cast<int>(0.5 * frequency));
+            }
+
+            int bl_start = std::max(0, beats[i].r - static_cast<int>(0.10 * frequency));
+            int bl_end = std::max(0, beats[i].r - static_cast<int>(0.04 * frequency));
+            double baseline = GetMean(signal, bl_start, bl_end);
+
+            beats[i].t_end = CalculateTEndIntersection(signal, sig_smooth, s_point, limit, baseline, frequency);
+        }
+
+        std::vector<int> p_on_map(signal.size(), 0);
+        std::vector<int> p_end_map(signal.size(), 0);
+        std::vector<int> qrs_on_map(signal.size(), 0);
+        std::vector<int> qrs_end_map(signal.size(), 0);
+        std::vector<int> t_end_map(signal.size(), 0);
+
+        for (const auto &b: beats) {
+            if (b.p_on >= 0) p_on_map[b.p_on] = 1;
+            if (b.p_end >= 0) p_end_map[b.p_end] = 1;
+            if (b.qrs_on >= 0) qrs_on_map[b.qrs_on] = 1;
+            if (b.qrs_end >= 0) qrs_end_map[b.qrs_end] = 1;
+            if (b.t_end >= 0) t_end_map[b.t_end] = 1;
+        }
+
+        for (size_t i = 0; i < datapoints.size(); ++i) {
+            if (i < p_on_map.size() && p_on_map[i]) result[i].p_wave_onset[ch] = true;
+            if (i < p_end_map.size() && p_end_map[i]) result[i].p_wave_end[ch] = true;
+            if (i < qrs_on_map.size() && qrs_on_map[i]) result[i].qrs_onset[ch] = true;
+            if (i < qrs_end_map.size() && qrs_end_map[i]) result[i].qrs_end[ch] = true;
+            if (i < t_end_map.size() && t_end_map[i]) result[i].t_end[ch] = true;
+        }
     }
 
     return result;

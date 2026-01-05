@@ -1,5 +1,7 @@
 #include "../../include/bridge/ekg_controller.h"
 #include "../../include/dto/r_peaks_detection_method.h"
+#include "../../include/dto/file_format.h"
+#include "../../include/repository/results_repository.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
@@ -9,9 +11,11 @@
 #include <cmath>
 #include <numeric>
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
-EkgController::EkgController(std::shared_ptr<IApplicationService> application_service, QObject *parent)
-    : QObject(parent), application_service_(std::move(application_service)) {
+EkgController::EkgController(std::shared_ptr<IApplicationService> application_service, std::shared_ptr<IResultsRepository> results_repository, QObject *parent)
+    : QObject(parent), application_service_(std::move(application_service)), results_repository_(std::move(results_repository)) {
 }
 
 void EkgController::loadData(const QString &filename) {
@@ -486,7 +490,10 @@ QVariantList EkgController::getRPeakMarkers(int channel) const {
     markers.reserve(peaks->size());
 
     for (size_t i = 0; i < peaks->size(); ++i) {
-        if (!(*peaks)[i].peak) continue;
+        const auto &peak = (*peaks)[i];
+        if (static_cast<size_t>(clampedChannel) >= peak.peaks.size() || !peak.peaks[static_cast<size_t>(clampedChannel)]) {
+            continue;
+        }
         const auto &point = filtered->values[i];
         if (static_cast<size_t>(clampedChannel) >= point.channelValues.size()) continue;
         const double t = static_cast<double>(i) / frequency;
@@ -601,32 +608,33 @@ QVariantMap EkgController::getWaveMarkers(int channel) const {
         
         const double t = static_cast<double>(i) / frequency;
         const double y = static_cast<double>(wave.channelValues[static_cast<size_t>(clampedChannel)]);
+        const size_t ch = static_cast<size_t>(clampedChannel);
 
-        if (wave.p_wave_onset) {
+        if (ch < wave.p_wave_onset.size() && wave.p_wave_onset[ch]) {
             QVariantMap entry;
             entry["x"] = t;
             entry["y"] = y;
             pOnsets.append(entry);
         }
-        if (wave.p_wave_end) {
+        if (ch < wave.p_wave_end.size() && wave.p_wave_end[ch]) {
             QVariantMap entry;
             entry["x"] = t;
             entry["y"] = y;
             pEnds.append(entry);
         }
-        if (wave.qrs_onset) {
+        if (ch < wave.qrs_onset.size() && wave.qrs_onset[ch]) {
             QVariantMap entry;
             entry["x"] = t;
             entry["y"] = y;
             qrsOnsets.append(entry);
         }
-        if (wave.qrs_end) {
+        if (ch < wave.qrs_end.size() && wave.qrs_end[ch]) {
             QVariantMap entry;
             entry["x"] = t;
             entry["y"] = y;
             qrsEnds.append(entry);
         }
-        if (wave.t_end) {
+        if (ch < wave.t_end.size() && wave.t_end[ch]) {
             QVariantMap entry;
             entry["x"] = t;
             entry["y"] = y;
@@ -665,4 +673,67 @@ double EkgController::samplingFrequency() const {
     if (filtered && filtered->frequency > 0) return static_cast<double>(filtered->frequency);
 
     return 0.0;
+}
+
+bool EkgController::exportFilteredSignal(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportFilteredSignal(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        application_service_->GetFilteredData()
+    );
+}
+
+bool EkgController::exportRPeaks(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportRPeaks(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        application_service_->GetRPeaks(),
+        application_service_->GetFilteredData()
+    );
+}
+
+bool EkgController::exportHRVTime(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportHRVTime(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        cached_hrv_metrics_
+    );
+}
+
+bool EkgController::exportHRVGeo(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportHRVGeo(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        cached_hrv_geo_metrics_
+    );
+}
+
+bool EkgController::exportWaves(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportWaves(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        application_service_->GetWaves(),
+        application_service_->GetFilteredData()
+    );
+}
+
+bool EkgController::exportHeartClass(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportHeartClass(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        cached_heart_class_result_,
+        samplingFrequency()
+    );
 }

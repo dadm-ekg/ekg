@@ -84,12 +84,12 @@ ApplicationWindow {
             chartLoading = true
         }
         Qt.callLater(function() {
-            var channel = clampChannelIndex(selectedChannelIndex)
-            chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
-            chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
-            chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
+        var channel = clampChannelIndex(selectedChannelIndex)
+        chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
+        chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
+        chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
             chartWaveMarkers = ekgController.getWaveMarkers(channel)
-            Qt.callLater(applySeriesToChart)
+        Qt.callLater(applySeriesToChart)
         })
     }
 
@@ -526,9 +526,88 @@ ApplicationWindow {
             }
 
             Button {
+                id: saveResultsButton
                 text: "Zapisz wyniki"
                 icon.name: "document-save"
                 Material.foreground: window.buttonTextColor
+                enabled: {
+                    if (window.currentModule === "ECG BASELINE") {
+                        return ekgController.baselineCompleted
+                    } else if (window.currentModule === "R PEAKS") {
+                        return ekgController.rPeaksCompleted
+                    } else if (window.currentModule === "HRV TIME") {
+                        return ekgController.hrvTimeCompleted
+                    } else if (window.currentModule === "HRV GEO") {
+                        return ekgController.hrvGeoCompleted
+                    } else if (window.currentModule === "WAVES") {
+                        return ekgController.wavesCompleted
+                    } else if (window.currentModule === "HEART CLASS") {
+                        return ekgController.heartClassCompleted
+                    }
+                    return false
+                }
+
+                Menu {
+                    id: saveResultsMenu
+                    x: saveResultsButton.x
+                    y: saveResultsButton.y + saveResultsButton.height
+
+                    MenuItem {
+                        text: "Zapisz jako CSV"
+                        onTriggered: {
+                            var baseName = ekgController.loadedFilename
+                            if (baseName === "") baseName = "wyniki"
+                            else {
+                                var lastDot = baseName.lastIndexOf(".")
+                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
+                            }
+                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
+                            var defaultFileName = baseName + "_" + moduleName + ".csv"
+                            exportFileDialog.nameFilters = ["CSV files (*.csv)", "All files (*)"]
+                            exportFileDialog.currentFile = defaultFileName
+                            exportFileDialog.selectedFormat = "csv"
+                            exportFileDialog.open()
+                        }
+                    }
+                    MenuItem {
+                        text: "Zapisz jako HTML"
+                        onTriggered: {
+                            var baseName = ekgController.loadedFilename
+                            if (baseName === "") baseName = "wyniki"
+                            else {
+                                var lastDot = baseName.lastIndexOf(".")
+                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
+                            }
+                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
+                            var defaultFileName = baseName + "_" + moduleName + ".html"
+                            exportFileDialog.nameFilters = ["HTML files (*.html)", "All files (*)"]
+                            exportFileDialog.currentFile = defaultFileName
+                            exportFileDialog.selectedFormat = "html"
+                            exportFileDialog.open()
+                        }
+                    }
+                    MenuItem {
+                        text: "Zapisz jako JSON"
+                        onTriggered: {
+                            var baseName = ekgController.loadedFilename
+                            if (baseName === "") baseName = "wyniki"
+                            else {
+                                var lastDot = baseName.lastIndexOf(".")
+                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
+                            }
+                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
+                            var defaultFileName = baseName + "_" + moduleName + ".json"
+                            exportFileDialog.nameFilters = ["JSON files (*.json)", "All files (*)"]
+                            exportFileDialog.currentFile = defaultFileName
+                            exportFileDialog.selectedFormat = "json"
+                            exportFileDialog.open()
+                        }
+                    }
+                }
+
+                onClicked: {
+                    saveResultsMenu.open()
+                }
             }
 
             Rectangle {
@@ -1094,21 +1173,21 @@ ApplicationWindow {
                                     text: "Tachogram RR"
                                     font.bold: true
                                     font.pixelSize: 14
-                                    Layout.fillWidth: true
-                                }
+                            Layout.fillWidth: true
+                            }
 
-                                ChartView {
-                                    Layout.fillWidth: true
+                            ChartView {
+                                Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    antialiasing: true
+                                antialiasing: true
                                     theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
-                                    backgroundColor: vizBg
-                                    legend.visible: false
+                                backgroundColor: vizBg
+                                legend.visible: false
 
                                     ValueAxis {
                                         id: hrvTimeTachogramTimeAxis
                                         titleText: "Czas [s]"
-                                        labelsColor: textSecondary
+                                    labelsColor: textSecondary
                                     }
 
                                     ValueAxis {
@@ -1127,25 +1206,25 @@ ApplicationWindow {
                                 }
                             }
 
-                            ColumnLayout {
+                        ColumnLayout {
                                 anchors.fill: parent
                                 visible: window.currentModule === "HRV GEO" && ekgController.hrvGeoCompleted
-                                spacing: 8
+                            spacing: 8
 
                                 Label {
                                     text: "Histogram interwałów RR"
                                     font.bold: true
                                     font.pixelSize: 14
-                                    Layout.fillWidth: true
-                                }
+                                Layout.fillWidth: true
+                            }
 
-                                ChartView {
-                                    Layout.fillWidth: true
+                            ChartView {
+                                Layout.fillWidth: true
                                     Layout.preferredHeight: parent.height * 0.5 - 20
-                                    antialiasing: true
+                                antialiasing: true
                                     theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
-                                    backgroundColor: vizBg
-                                    legend.visible: false
+                                backgroundColor: vizBg
+                                legend.visible: false
 
                                     ValueAxis {
                                         id: hrvGeoHistogramAxisX
@@ -1159,7 +1238,7 @@ ApplicationWindow {
                                         labelsColor: textSecondary
                                     }
 
-                                    LineSeries {
+                                LineSeries {
                                         id: histogramBarSeries
                                         axisX: hrvGeoHistogramAxisX
                                         axisY: hrvGeoHistogramAxisY
@@ -1175,13 +1254,13 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                 }
 
-                                ChartView {
-                                    Layout.fillWidth: true
+                            ChartView {
+                                Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    antialiasing: true
+                                antialiasing: true
                                     theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
-                                    backgroundColor: vizBg
-                                    legend.visible: false
+                                backgroundColor: vizBg
+                                legend.visible: false
 
                                     ValueAxis {
                                         id: hrvGeoPoincareAxisX
@@ -1195,7 +1274,7 @@ ApplicationWindow {
                                         labelsColor: textSecondary
                                     }
 
-                                    ScatterSeries {
+                                ScatterSeries {
                                         id: poincareSeries
                                         axisX: hrvGeoPoincareAxisX
                                         axisY: hrvGeoPoincareAxisY
@@ -1245,11 +1324,11 @@ ApplicationWindow {
                                         BarSet {
                                             id: heartClassBarSet
                                             label: "Klasy"
-                                        }
-                                    }
-                                }
-                            }
                         }
+                    }
+                }
+            }
+        }
 
                     }
                 }
@@ -1375,7 +1454,7 @@ ApplicationWindow {
                                     return "Przetwarzanie..."
                                 } else if (!hrvTimeOK) {
                                     return "Gotowy"
-                                } else {
+                            } else {
                                     if (lastUsedHRVTimeMethod !== "") {
                                         return "Obliczono metoda " + lastUsedHRVTimeMethod
                                     } else {
@@ -1589,6 +1668,7 @@ ApplicationWindow {
                         }
                     }
 
+
                     Button {
                         text: "Reset"
                         Layout.preferredWidth: 100
@@ -1737,34 +1817,34 @@ ApplicationWindow {
                 }
             }
 
-            Label {
+                Label {
                 text: "Wybierz filtr:"
-                color: textSecondary
+                    color: textSecondary
                 font.pixelSize: 13
-            }
+                }
 
-            ButtonGroup {
-                id: filterGroup
-            }
+                ButtonGroup {
+                    id: filterGroup
+                }
 
-            RadioButton {
-                id: rbMovingAverage
-                text: "Moving Average"
-                ButtonGroup.group: filterGroup
+                RadioButton {
+                    id: rbMovingAverage
+                    text: "Moving Average"
+                    ButtonGroup.group: filterGroup
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 0
-            }
+                }
 
-            RadioButton {
-                id: rbButterworth
-                text: "Butterworth"
-                ButtonGroup.group: filterGroup
+                RadioButton {
+                    id: rbButterworth
+                    text: "Butterworth"
+                    ButtonGroup.group: filterGroup
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 1
-            }
+                }
 
-            RadioButton {
-                id: rbSavitzky
-                text: "Savitzky-Golay"
-                ButtonGroup.group: filterGroup
+                RadioButton {
+                    id: rbSavitzky
+                    text: "Savitzky-Golay"
+                    ButtonGroup.group: filterGroup
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 2
             }
         }
@@ -1815,34 +1895,34 @@ ApplicationWindow {
                 }
             }
 
-            Label {
+                Label {
                 text: "Wybierz metode detekcji:"
-                color: textSecondary
+                    color: textSecondary
                 font.pixelSize: 13
-            }
+                }
 
-            ButtonGroup {
-                id: detectionMethodGroup
-            }
+                ButtonGroup {
+                    id: detectionMethodGroup
+                }
 
-            RadioButton {
-                id: rbPanTompkins
-                text: "Pan-Tompkins"
-                ButtonGroup.group: detectionMethodGroup
+                RadioButton {
+                    id: rbPanTompkins
+                    text: "Pan-Tompkins"
+                    ButtonGroup.group: detectionMethodGroup
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 0
-            }
+                }
 
-            RadioButton {
-                id: rbHilbert
-                text: "Transformata Hilberta"
-                ButtonGroup.group: detectionMethodGroup
+                RadioButton {
+                    id: rbHilbert
+                    text: "Transformata Hilberta"
+                    ButtonGroup.group: detectionMethodGroup
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 1
-            }
+                }
 
-            RadioButton {
-                id: rbWavelet
-                text: "Falkowa (Wavelet)"
-                ButtonGroup.group: detectionMethodGroup
+                RadioButton {
+                    id: rbWavelet
+                    text: "Falkowa (Wavelet)"
+                    ButtonGroup.group: detectionMethodGroup
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 2
             }
         }
@@ -2422,6 +2502,91 @@ ApplicationWindow {
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
+        }
+    }
+
+    FileDialog {
+        id: exportFileDialog
+        title: "Zapisz wyniki"
+        fileMode: FileDialog.SaveFile
+        nameFilters: [
+            "CSV files (*.csv)",
+            "HTML files (*.html)",
+            "JSON files (*.json)",
+            "All files (*)"
+        ]
+        property string selectedFormat: "csv"
+
+        function getFormatEnum(formatString) {
+            if (formatString === "csv") return 0
+            if (formatString === "html") return 1
+            if (formatString === "json") return 2
+            return 0
+        }
+
+        onAccepted: {
+            var filepath = currentFile.toString()
+            if (filepath.startsWith("file://")) {
+                filepath = filepath.substring(7)
+            }
+            var success = false
+            var formatEnum = getFormatEnum(exportFileDialog.selectedFormat)
+            
+            if (window.currentModule === "ECG BASELINE") {
+                success = ekgController.exportFilteredSignal(formatEnum, filepath)
+            } else if (window.currentModule === "R PEAKS") {
+                success = ekgController.exportRPeaks(formatEnum, filepath)
+            } else if (window.currentModule === "HRV TIME") {
+                success = ekgController.exportHRVTime(formatEnum, filepath)
+            } else if (window.currentModule === "HRV GEO") {
+                success = ekgController.exportHRVGeo(formatEnum, filepath)
+            } else if (window.currentModule === "WAVES") {
+                success = ekgController.exportWaves(formatEnum, filepath)
+            } else if (window.currentModule === "HEART CLASS") {
+                success = ekgController.exportHeartClass(formatEnum, filepath)
+            }
+            
+            if (success) {
+                exportSuccessDialog.open()
+            } else {
+                exportErrorDialog.open()
+            }
+        }
+    }
+
+    Dialog {
+        id: exportSuccessDialog
+        title: "Sukces"
+        modal: true
+        standardButtons: Dialog.Ok
+        implicitWidth: 300
+
+        onVisibleChanged: if (visible) {
+            x = (window.width  - implicitWidth)  / 2
+            y = (window.height - implicitHeight) / 2
+        }
+
+        contentItem: Label {
+            text: "Wyniki zostały zapisane pomyślnie."
+            wrapMode: Text.WordWrap
+        }
+    }
+
+    Dialog {
+        id: exportErrorDialog
+        title: "Błąd"
+        modal: true
+        standardButtons: Dialog.Ok
+        implicitWidth: 300
+
+        onVisibleChanged: if (visible) {
+            x = (window.width  - implicitWidth)  / 2
+            y = (window.height - implicitHeight) / 2
+        }
+
+        contentItem: Label {
+            text: "Nie udało się zapisać wyników. Upewnij się, że moduł został uruchomiony i że masz uprawnienia do zapisu pliku."
+            wrapMode: Text.WordWrap
         }
     }
 

@@ -19,10 +19,10 @@ std::vector<double> ExtractRRIntervals(
         return rr_intervals;
     }
     
-    // Znajdź wszystkie indeksy, gdzie peak == true
+    // Znajdź wszystkie indeksy, gdzie peak == true dla pierwszego kanału
     std::vector<size_t> peak_indices;
     for (size_t i = 0; i < r_peaks.size(); ++i) {
-        if (r_peaks[i].peak) {
+        if (!r_peaks[i].peaks.empty() && r_peaks[i].peaks[0]) {
             peak_indices.push_back(i);
         }
     }

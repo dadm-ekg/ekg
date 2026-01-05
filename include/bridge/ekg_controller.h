@@ -7,6 +7,7 @@
 #include <QVariantMap>
 #include <memory>
 #include "../service/abstract/application_service.h"
+#include "../repository/abstract/results_repository.h"
 
 class EkgController : public QObject {
     Q_OBJECT
@@ -43,7 +44,7 @@ public:
     };
     Q_ENUM(HRVSpectralMethod)
 
-    explicit EkgController(std::shared_ptr<IApplicationService> application_service, QObject *parent = nullptr);
+    explicit EkgController(std::shared_ptr<IApplicationService> application_service, std::shared_ptr<IResultsRepository> results_repository, QObject *parent = nullptr);
 
     Q_INVOKABLE void loadData(const QString &filename);
     Q_INVOKABLE void openFileDialog();
@@ -75,6 +76,12 @@ public:
     Q_INVOKABLE QVariantList getHeartClassAnnotations() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
+    Q_INVOKABLE bool exportFilteredSignal(int format, const QString &filepath);
+    Q_INVOKABLE bool exportRPeaks(int format, const QString &filepath);
+    Q_INVOKABLE bool exportHRVTime(int format, const QString &filepath);
+    Q_INVOKABLE bool exportHRVGeo(int format, const QString &filepath);
+    Q_INVOKABLE bool exportWaves(int format, const QString &filepath);
+    Q_INVOKABLE bool exportHeartClass(int format, const QString &filepath);
 
     QString loadedFilename() const;
     bool isFileLoaded() const;
@@ -115,6 +122,7 @@ signals:
 
 private:
     std::shared_ptr<IApplicationService> application_service_;
+    std::shared_ptr<IResultsRepository> results_repository_;
     bool baseline_completed_ = false;
     bool r_peaks_completed_ = false;
     bool hrv_time_completed_ = false;
