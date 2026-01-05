@@ -240,55 +240,71 @@ ApplicationWindow {
             var tachogram = ekgController.getHRVTimeTachogram()
             tachogramSeries.clear()
             var maxRR = 0, minRR = Infinity
+            var maxTime = 0
             for (var j = 0; j < tachogram.length; j++) {
                 var t = tachogram[j]
                 tachogramSeries.append(t.x, t.y)
                 if (t.y > maxRR) maxRR = t.y
                 if (t.y < minRR) minRR = t.y
+                if (t.x > maxTime) maxTime = t.x
             }
             if (tachogram.length > 0) {
+                hrvTimeTachogramTimeAxis.min = 0
+                hrvTimeTachogramTimeAxis.max = maxTime
                 hrvTimeTachogramRRAxis.min = Math.max(0, minRR * 0.9)
                 hrvTimeTachogramRRAxis.max = maxRR * 1.1
             }
         } else if (window.currentModule === "HRV GEO" && ekgController.hrvGeoCompleted) {
             var histogram = ekgController.getHRVGeoHistogram()
+            console.log("HRV GEO histogram length:", histogram ? histogram.length : 0)
             if (histogram && histogram.length > 0) {
-                histogramBarSeries.clear()
+                histogramLineSeries.clear()
                 var maxCount = 0
                 var minRR = Infinity
                 var maxRR = 0
                 for (var k = 0; k < histogram.length; k++) {
                     var h = histogram[k]
-                    if (h && h.x !== undefined && h.y !== undefined) {
-                        histogramBarSeries.append(h.x, h.y)
-                        if (h.y > maxCount) maxCount = h.y
-                        if (h.x < minRR) minRR = h.x
-                        if (h.x > maxRR) maxRR = h.x
+                    if (h) {
+                        var xVal = h.x !== undefined ? h.x : h["x"]
+                        var yVal = h.y !== undefined ? h.y : h["y"]
+                        if (xVal !== undefined && yVal !== undefined) {
+                            histogramLineSeries.append(xVal, yVal)
+                            if (yVal > maxCount) maxCount = yVal
+                            if (xVal < minRR) minRR = xVal
+                            if (xVal > maxRR) maxRR = xVal
+                        }
                     }
                 }
-                if (histogramBarSeries.count > 0) {
+                console.log("HRV GEO histogram points:", histogramLineSeries.count, "maxCount:", maxCount)
+                if (histogramLineSeries.count > 0) {
+                    var margin = (maxRR - minRR) * 0.05
+                    hrvGeoHistogramAxisX.min = minRR - margin
+                    hrvGeoHistogramAxisX.max = maxRR + margin
                     hrvGeoHistogramAxisY.max = maxCount * 1.1
                     hrvGeoHistogramAxisY.min = 0
-                    var margin = (maxRR - minRR) * 0.05
-                    hrvGeoHistogramAxisX.min = Math.max(0, minRR - margin)
-                    hrvGeoHistogramAxisX.max = maxRR + margin
                 }
             }
 
             var poincare = ekgController.getHRVGeoPoincare()
+            console.log("HRV GEO poincare length:", poincare ? poincare.length : 0)
             if (poincare && poincare.length > 0) {
                 poincareSeries.clear()
                 var maxRRGeo = 0, minRRGeo = Infinity
                 for (var l = 0; l < poincare.length; l++) {
                     var pc = poincare[l]
-                    if (pc && pc.x !== undefined && pc.y !== undefined) {
-                        poincareSeries.append(pc.x, pc.y)
-                        if (pc.x > maxRRGeo) maxRRGeo = pc.x
-                        if (pc.y > maxRRGeo) maxRRGeo = pc.y
-                        if (pc.x < minRRGeo) minRRGeo = pc.x
-                        if (pc.y < minRRGeo) minRRGeo = pc.y
+                    if (pc) {
+                        var xVal = pc.x !== undefined ? pc.x : pc["x"]
+                        var yVal = pc.y !== undefined ? pc.y : pc["y"]
+                        if (xVal !== undefined && yVal !== undefined) {
+                            poincareSeries.append(xVal, yVal)
+                            if (xVal > maxRRGeo) maxRRGeo = xVal
+                            if (yVal > maxRRGeo) maxRRGeo = yVal
+                            if (xVal < minRRGeo) minRRGeo = xVal
+                            if (yVal < minRRGeo) minRRGeo = yVal
+                        }
                     }
                 }
+                console.log("HRV GEO poincare points:", poincareSeries.count, "min:", minRRGeo, "max:", maxRRGeo)
                 if (poincareSeries.count > 0) {
                     var margin = (maxRRGeo - minRRGeo) * 0.1
                     hrvGeoPoincareAxisX.min = Math.max(0, minRRGeo - margin)
@@ -1193,7 +1209,7 @@ ApplicationWindow {
                                         titleText: "Częstotliwość [Hz]"
                                         labelsColor: textSecondary
                                         min: 0
-                                        max: 0.5
+                                        max: 2.0
                                     }
 
                                     ValueAxis {
@@ -1280,12 +1296,17 @@ ApplicationWindow {
                                         labelsColor: textSecondary
                                     }
 
-                                    LineSeries {
-                                        id: histogramBarSeries
+                                    AreaSeries {
+                                        id: histogramAreaSeries
                                         axisX: hrvGeoHistogramAxisX
                                         axisY: hrvGeoHistogramAxisY
                                         color: "#10b981"
-                                        width: 3
+                                        borderColor: "#059669"
+                                        borderWidth: 2
+                                        
+                                        upperSeries: LineSeries {
+                                            id: histogramLineSeries
+                                        }
                                     }
                                 }
 

@@ -621,6 +621,7 @@ bool ResultsRepository::ExportHRVTimeHTML(const QString &filepath, const QString
     out << "tr:hover { background-color: #f5f5f5; }\n";
     out << ".info { background-color: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }\n";
     out << ".chart-container { background-color: white; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n";
+    out << "canvas { height: 300px !important; }\n";
     out << "</style>\n";
     out << "</head>\n";
     out << "<body>\n";
@@ -694,6 +695,8 @@ bool ResultsRepository::ExportHRVTimeHTML(const QString &filepath, const QString
         out << "  data: powerSpectrumData,\n";
         out << "  options: {\n";
         out << "    responsive: true,\n";
+        out << "    maintainAspectRatio: true,\n";
+        out << "    aspectRatio: 2.5,\n";
         out << "    plugins: { legend: { display: true } },\n";
         out << "    scales: {\n";
         out << "      x: { title: { display: true, text: 'Frequency (Hz)' } },\n";
@@ -731,6 +734,8 @@ bool ResultsRepository::ExportHRVTimeHTML(const QString &filepath, const QString
         out << "  data: tachogramData,\n";
         out << "  options: {\n";
         out << "    responsive: true,\n";
+        out << "    maintainAspectRatio: true,\n";
+        out << "    aspectRatio: 2.5,\n";
         out << "    plugins: { legend: { display: true } },\n";
         out << "    scales: {\n";
         out << "      x: { title: { display: true, text: 'Time (s)' } },\n";
