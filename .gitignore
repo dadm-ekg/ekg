@@ -90,3 +90,5 @@ ekg_autogen/
 .qt/
 
 cmake-build-debug
+
+ekg_settings.json

@@ -8,6 +8,11 @@
 #include <QFileDialog>
 #include <QPointF>
 #include <QVariant>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QFile>
+#include <QTextStream>
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -763,4 +768,100 @@ bool EkgController::exportHeartClass(int format, const QString &filepath) {
         cached_heart_class_result_,
         samplingFrequency()
     );
+}
+
+void EkgController::openSaveSettingsDialog(int selectedFilterMethod, int selectedRPeaksMethod, int selectedHRVTimeMethod, int selectedChannelIndex, const QString &currentModule, bool isDarkTheme, double chartWindowSize, int maxPlottedPoints, int windowSize, int polynomialOrder) {
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir dir(appDir);
+    
+    while (!dir.exists("ludb") && dir.cdUp()) {
+    }
+    
+    QString defaultPath = dir.absolutePath();
+    QString filename = QFileDialog::getSaveFileName(
+        nullptr,
+        "Zapisz ustawienia",
+        defaultPath + "/ekg_settings.json",
+        "JSON files (*.json);;All Files (*)"
+    );
+    
+    if (filename.isEmpty()) {
+        return;
+    }
+    
+    QJsonObject settings;
+    settings["selectedFilterMethod"] = selectedFilterMethod;
+    settings["selectedRPeaksMethod"] = selectedRPeaksMethod;
+    settings["selectedHRVTimeMethod"] = selectedHRVTimeMethod;
+    settings["selectedChannel"] = selectedChannelIndex;
+    settings["currentModule"] = currentModule;
+    settings["isDarkTheme"] = isDarkTheme;
+    settings["chartWindowSize"] = chartWindowSize;
+    settings["maxPlottedPoints"] = maxPlottedPoints;
+    settings["windowSize"] = windowSize;
+    settings["polynomialOrder"] = polynomialOrder;
+    
+    QJsonDocument doc(settings);
+    QFile file(filename);
+    
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit settingsSaveError("Nie można otworzyć pliku do zapisu");
+        return;
+    }
+    
+    file.write(doc.toJson());
+    file.close();
+    
+    emit settingsSaveSuccess(filename);
+}
+
+void EkgController::openLoadSettingsDialog() {
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir dir(appDir);
+    
+    while (!dir.exists("ludb") && dir.cdUp()) {
+    }
+    
+    QString defaultPath = dir.absolutePath();
+    QString filename = QFileDialog::getOpenFileName(
+        nullptr,
+        "Załaduj ustawienia",
+        defaultPath,
+        "JSON files (*.json);;All Files (*)"
+    );
+    
+    if (filename.isEmpty()) {
+        return;
+    }
+    
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        emit settingsLoadError("Nie można otworzyć pliku do odczytu");
+        return;
+    }
+    
+    QByteArray data = file.readAll();
+    file.close();
+    
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+    
+    if (error.error != QJsonParseError::NoError) {
+        emit settingsLoadError("Błąd parsowania JSON: " + error.errorString());
+        return;
+    }
+    
+    if (!doc.isObject()) {
+        emit settingsLoadError("Nieprawidłowy format pliku ustawień");
+        return;
+    }
+    
+    QJsonObject settings = doc.object();
+    QVariantMap settingsMap;
+    
+    for (auto it = settings.begin(); it != settings.end(); ++it) {
+        settingsMap[it.key()] = it.value().toVariant();
+    }
+    
+    emit settingsLoadSuccess(settingsMap);
 }

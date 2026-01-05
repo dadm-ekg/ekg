@@ -54,6 +54,7 @@ ApplicationWindow {
     property real chartScrollPosition: 0.0
     property real chartMinWindowSize: 1.0
     property real chartMaxWindowSize: 60.0
+    property var loadedSettings: null
 
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
@@ -335,6 +336,57 @@ ApplicationWindow {
         Qt.callLater(updateAnalysisCharts)
     }
 
+    function applyLoadedSettings() {
+        if (!loadedSettings) return
+        
+        var settings = loadedSettings
+        
+        if (paramsLoader.item) {
+            if (window.currentModule === "ECG BASELINE") {
+                if ("selectedFilterMethod" in settings) {
+                    var filterMethod = settings["selectedFilterMethod"]
+                    if (filterMethod === 0 && paramsLoader.item.rbMovingAverage) {
+                        paramsLoader.item.rbMovingAverage.checked = true
+                    } else if (filterMethod === 1 && paramsLoader.item.rbButterworth) {
+                        paramsLoader.item.rbButterworth.checked = true
+                    } else if (filterMethod === 2 && paramsLoader.item.rbSavitzkyGolay) {
+                        paramsLoader.item.rbSavitzkyGolay.checked = true
+                    }
+                }
+                if ("windowSize" in settings) {
+                    paramsLoader.item.windowSize = settings["windowSize"]
+                }
+                if ("polynomialOrder" in settings) {
+                    paramsLoader.item.polynomialOrder = settings["polynomialOrder"]
+                }
+            } else if (window.currentModule === "R PEAKS") {
+                if ("selectedRPeaksMethod" in settings) {
+                    var rpeaksMethod = settings["selectedRPeaksMethod"]
+                    if (rpeaksMethod === 0 && paramsLoader.item.rbPanTompkins) {
+                        paramsLoader.item.rbPanTompkins.checked = true
+                    } else if (rpeaksMethod === 1 && paramsLoader.item.rbHilbert) {
+                        paramsLoader.item.rbHilbert.checked = true
+                    } else if (rpeaksMethod === 2 && paramsLoader.item.rbWavelet) {
+                        paramsLoader.item.rbWavelet.checked = true
+                    }
+                }
+            } else if (window.currentModule === "HRV TIME") {
+                if ("selectedHRVTimeMethod" in settings) {
+                    var hrvMethod = settings["selectedHRVTimeMethod"]
+                    if (hrvMethod === 0 && paramsLoader.item.rbClassicPeriodogram) {
+                        paramsLoader.item.rbClassicPeriodogram.checked = true
+                    } else if (hrvMethod === 1 && paramsLoader.item.rbLombScargle) {
+                        paramsLoader.item.rbLombScargle.checked = true
+                    } else if (hrvMethod === 2 && paramsLoader.item.rbWelch) {
+                        paramsLoader.item.rbWelch.checked = true
+                    }
+                }
+            }
+        }
+        
+        loadedSettings = null
+    }
+
     function updateMarkerVisibility() {
         peaksSeries.visible = window.currentModule === "R PEAKS" && chartRPeaksSeries.length > 0
 
@@ -512,6 +564,61 @@ ApplicationWindow {
                 }
             }
         }
+
+        function onSettingsSaveSuccess(filepath) {
+            showTemporaryStatus("✓ Ustawienia zapisane", Material.Green)
+        }
+
+        function onSettingsSaveError(errorMessage) {
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
+
+        function onSettingsLoadSuccess(settings) {
+            console.log("Settings loaded:", JSON.stringify(settings))
+            
+            window.loadedSettings = settings
+            
+            if ("isDarkTheme" in settings) {
+                window.isDarkTheme = settings["isDarkTheme"]
+            }
+            if ("chartWindowSize" in settings) {
+                window.chartWindowSize = settings["chartWindowSize"]
+            }
+            if ("maxPlottedPoints" in settings) {
+                window.maxPlottedPoints = settings["maxPlottedPoints"]
+            }
+            if ("selectedChannel" in settings) {
+                window.selectedChannelIndex = settings["selectedChannel"]
+            }
+            if ("selectedFilterMethod" in settings) {
+                window.selectedFilterMethod = settings["selectedFilterMethod"]
+            }
+            if ("selectedRPeaksMethod" in settings) {
+                window.selectedRPeaksMethod = settings["selectedRPeaksMethod"]
+            }
+            if ("selectedHRVTimeMethod" in settings) {
+                window.selectedHRVTimeMethod = settings["selectedHRVTimeMethod"]
+            }
+            
+            if ("currentModule" in settings) {
+                var modules = ["ECG BASELINE", "R PEAKS", "WAVES", "HRV TIME", "HRV GEO", "HEART CLASS"]
+                var idx = modules.indexOf(settings["currentModule"])
+                if (idx >= 0) {
+                    moduleCombo.currentIndex = idx
+                }
+            }
+            
+            Qt.callLater(function() {
+                applyLoadedSettings()
+            })
+            
+            showTemporaryStatus("✓ Ustawienia wczytane", Material.Green)
+            refreshVisualization()
+        }
+
+        function onSettingsLoadError(errorMessage) {
+            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+        }
     }
 
     function showTemporaryStatus(message, color) {
@@ -568,6 +675,57 @@ ApplicationWindow {
                 icon.name: "document-open"
                 Material.foreground: window.buttonTextColor
                 onClicked: ekgController.openFileDialog()
+            }
+
+            Button {
+                id: settingsButton
+                text: "Ustawienia"
+                Material.foreground: window.buttonTextColor
+                Layout.alignment: Qt.AlignVCenter
+
+                Menu {
+                    id: settingsMenu
+                    x: settingsButton.x
+                    y: settingsButton.y + settingsButton.height
+
+                    MenuItem {
+                        text: "Wyeksportuj ustawienia"
+                        onTriggered: {
+                            var windowSize = 5
+                            var polynomialOrder = 2
+                            if (window.currentModule === "ECG BASELINE" && paramsLoader.item) {
+                                if (paramsLoader.item.windowSize !== undefined) {
+                                    windowSize = paramsLoader.item.windowSize
+                                }
+                                if (paramsLoader.item.polynomialOrder !== undefined) {
+                                    polynomialOrder = paramsLoader.item.polynomialOrder
+                                }
+                            }
+                            ekgController.openSaveSettingsDialog(
+                                window.selectedFilterMethod,
+                                window.selectedRPeaksMethod,
+                                window.selectedHRVTimeMethod,
+                                window.selectedChannelIndex,
+                                window.currentModule,
+                                window.isDarkTheme,
+                                window.chartWindowSize,
+                                window.maxPlottedPoints,
+                                windowSize,
+                                polynomialOrder
+                            )
+                        }
+                    }
+                    MenuItem {
+                        text: "Załaduj ustawienia"
+                        onTriggered: {
+                            ekgController.openLoadSettingsDialog()
+                        }
+                    }
+                }
+
+                onClicked: {
+                    settingsMenu.open()
+                }
             }
 
             Button {
@@ -1657,6 +1815,11 @@ ApplicationWindow {
                                         window.currentModule === "HRV GEO" ? hrvGeoParams :
                                             window.currentModule === "HEART CLASS" ? heartClassParams :
                                             null
+                    onLoaded: {
+                        if (window.loadedSettings) {
+                            Qt.callLater(applyLoadedSettings)
+                        }
+                    }
                 }
 
                 Item {
@@ -1872,6 +2035,9 @@ ApplicationWindow {
 
             property int windowSize: 5
             property int polynomialOrder: 2
+            property alias rbMovingAverage: rbMovingAverage
+            property alias rbButterworth: rbButterworth
+            property alias rbSavitzkyGolay: rbSavitzkyGolay
 
             Component.onCompleted: {
                 if (window.selectedFilterMethod === 0) rbMovingAverage.checked = true
@@ -2009,6 +2175,10 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 8
 
+            property alias rbPanTompkins: rbPanTompkins
+            property alias rbHilbert: rbHilbert
+            property alias rbWavelet: rbWavelet
+
             Component.onCompleted: {
                 if (window.selectedRPeaksMethod === 0) rbPanTompkins.checked = true
                 else if (window.selectedRPeaksMethod === 1) rbHilbert.checked = true
@@ -2088,6 +2258,10 @@ ApplicationWindow {
             id: hrvTimeRoot
             Layout.fillWidth: true
             spacing: 8
+
+            property alias rbClassicPeriodogram: rbClassicPeriodogram
+            property alias rbLombScargle: rbLombScargle
+            property alias rbWelch: rbWelch
 
             Component.onCompleted: {
                 if (window.selectedHRVTimeMethod === 0) rbClassicPeriodogram.checked = true

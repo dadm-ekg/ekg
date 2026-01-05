@@ -71,6 +71,8 @@ public:
     Q_INVOKABLE bool exportHRVGeo(int format, const QString &filepath);
     Q_INVOKABLE bool exportWaves(int format, const QString &filepath);
     Q_INVOKABLE bool exportHeartClass(int format, const QString &filepath);
+    Q_INVOKABLE void openSaveSettingsDialog(int selectedFilterMethod, int selectedRPeaksMethod, int selectedHRVTimeMethod, int selectedChannelIndex, const QString &currentModule, bool isDarkTheme, double chartWindowSize, int maxPlottedPoints, int windowSize, int polynomialOrder);
+    Q_INVOKABLE void openLoadSettingsDialog();
 
     QString loadedFilename() const;
     bool isFileLoaded() const;
@@ -108,6 +110,10 @@ signals:
     void wavesError(const QString &errorMessage);
     void heartClassSuccess();
     void heartClassError(const QString &errorMessage);
+    void settingsSaveSuccess(const QString &filepath);
+    void settingsSaveError(const QString &errorMessage);
+    void settingsLoadSuccess(const QVariantMap &settings);
+    void settingsLoadError(const QString &errorMessage);
 
 private:
     std::shared_ptr<IApplicationService> application_service_;
