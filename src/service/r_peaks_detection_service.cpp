@@ -441,8 +441,6 @@ std::vector<RPeaksAnnotatedSignalDatapoint> RPeaksDetectionService::Detect(
     const std::vector<SignalDatapoint>& datapoints, int frequency,
     RPeaksDetectionMethod method) {
 
-    (void)method;
-
     if (datapoints.empty() || frequency <= 0) {
         return {};
     }
@@ -458,35 +456,65 @@ std::vector<RPeaksAnnotatedSignalDatapoint> RPeaksDetectionService::Detect(
     std::vector<RPeaksAnnotatedSignalDatapoint> result;
     result.reserve(datapoints.size());
 
+    std::string method_name;
+    switch (method) {
+        case PanTompkins:
+            method_name = "Pan-Tompkins";
+            break;
+        case Hilbert:
+            method_name = "Transformata Hilberta";
+            break;
+        case Wavelet:
+            method_name = "Falkowa (Wavelet)";
+            break;
+        default:
+            method_name = "Pan-Tompkins (domyślna)";
+            break;
+    }
+
+    std::cout << "\n========== DETEKCJA PIKÓW R ==========\n";
+    std::cout << "Liczba kanałów: " << num_channels << "\n";
+    std::cout << "Wybrana metoda: " << method_name << "\n";
+    std::cout << "Częstotliwość próbkowania: " << fs << " Hz\n";
+    std::cout << "Liczba próbek: " << datapoints.size() << "\n";
+    std::cout << "==========================================\n";
+
+    for (size_t i = 0; i < datapoints.size(); ++i) {
+        RPeaksAnnotatedSignalDatapoint annotated_point;
+        annotated_point.channelValues = datapoints[i].channelValues;
+        annotated_point.peaks.resize(num_channels, false);
+        result.push_back(annotated_point);
+    }
+
     for (size_t ch = 0; ch < num_channels; ++ch) {
         std::vector<float> signal(datapoints.size());
         for (size_t i = 0; i < datapoints.size(); ++i) {
-            signal[i] = datapoints[i].channelValues[ch];
-        }
-
-        std::vector<int> peaks_pan_tompkins = DetectPeaksPanTompkins(signal, fs);
-        std::vector<int> peaks_hilbert      = DetectPeaksHilbert(signal, fs);
-        std::vector<int> peaks_wavelet      = DetectPeaksWavelet(signal, fs);
-
-        if (ch == 0) {
-            std::vector<DetectionMetrics> metrics_list;
-            metrics_list.push_back(ComputeMetrics(peaks_pan_tompkins, signal, "Pan-Tompkins"));
-            metrics_list.push_back(ComputeMetrics(peaks_hilbert, signal, "Transformata Hilberta"));
-            metrics_list.push_back(ComputeMetrics(peaks_wavelet, signal, "Falkowa (Wavelet-like)"));
-            PrintComparisonReport(metrics_list, fs);
-        }
-
-        if (ch == 0) {
-            for (size_t i = 0; i < datapoints.size(); ++i) {
-                RPeaksAnnotatedSignalDatapoint annotated_point;
-                annotated_point.channelValues = datapoints[i].channelValues;
-                annotated_point.peaks.resize(num_channels, false);
-                result.push_back(annotated_point);
+            if (i < datapoints.size() && ch < datapoints[i].channelValues.size()) {
+                signal[i] = datapoints[i].channelValues[ch];
+            } else {
+                signal[i] = 0.0f;
             }
         }
 
+        std::vector<int> peaks_selected;
+
+        switch (method) {
+            case PanTompkins:
+                peaks_selected = DetectPeaksPanTompkins(signal, fs);
+                break;
+            case Hilbert:
+                peaks_selected = DetectPeaksHilbert(signal, fs);
+                break;
+            case Wavelet:
+                peaks_selected = DetectPeaksWavelet(signal, fs);
+                break;
+            default:
+                peaks_selected = DetectPeaksPanTompkins(signal, fs);
+                break;
+        }
+
         std::vector<char> is_peak(datapoints.size(), 0);
-        for (int idx : peaks_pan_tompkins) {
+        for (int idx : peaks_selected) {
             if (idx >= 0 && idx < static_cast<int>(is_peak.size())) {
                 is_peak[idx] = 1;
             }
@@ -496,16 +524,7 @@ std::vector<RPeaksAnnotatedSignalDatapoint> RPeaksDetectionService::Detect(
             result[i].peaks[ch] = (is_peak[i] != 0);
         }
 
-        if (ch == 0) {
-            std::cout << "\n========== PODSUMOWANIE DETEKCJI (Kanał " << (ch + 1) << ") ==========\n";
-            std::cout << "Pan-Tompkins: " << peaks_pan_tompkins.size() << " pików\n";
-            std::cout << "Transformata Hilberta: " << peaks_hilbert.size() << " pików\n";
-            std::cout << "Falkowa: " << peaks_wavelet.size() << " pików\n";
-            std::cout << "Wybrana metoda główna: Pan-Tompkins\n";
-        } else {
-            std::cout << "\n========== PODSUMOWANIE DETEKCJI (Kanał " << (ch + 1) << ") ==========\n";
-            std::cout << "Pan-Tompkins: " << peaks_pan_tompkins.size() << " pików\n";
-        }
+        std::cout << "Kanał " << (ch + 1) << ": wykryto " << peaks_selected.size() << " pików R\n";
     }
 
     std::cout << "==========================================\n";
