@@ -210,22 +210,24 @@ bool ResultsRepository::ExportFilteredSignalHTML(const QString &filepath, const 
     QTextStream out(&file);
     out.setRealNumberPrecision(6);
     
+    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
+    const size_t maxSamples = std::min(filtered_data->values.size(), static_cast<size_t>(50000));
+    const size_t numChannels = filtered_data->values.empty() ? 0 : filtered_data->values.front().channelValues.size();
+    
     out << "<!DOCTYPE html>\n";
     out << "<html>\n";
     out << "<head>\n";
     out << "<meta charset=\"UTF-8\">\n";
     out << "<title>EKG Results - ECG BASELINE</title>\n";
+    out << "<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js\"></script>\n";
     out << "<style>\n";
     out << "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n";
     out << "h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }\n";
     out << "h2 { color: #555; margin-top: 30px; }\n";
     out << "h3 { color: #666; margin-top: 20px; }\n";
-    out << "table { border-collapse: collapse; width: 100%; margin: 20px 0; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n";
-    out << "th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }\n";
-    out << "th { background-color: #4CAF50; color: white; font-weight: bold; }\n";
-    out << "tr:nth-child(even) { background-color: #f9f9f9; }\n";
-    out << "tr:hover { background-color: #f5f5f5; }\n";
     out << ".info { background-color: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }\n";
+    out << ".chart-container { background-color: white; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px; }\n";
+    out << "canvas { max-height: 400px; }\n";
     out << "</style>\n";
     out << "</head>\n";
     out << "<body>\n";
@@ -235,33 +237,60 @@ bool ResultsRepository::ExportFilteredSignalHTML(const QString &filepath, const 
     out << "<p><strong>Filename:</strong> " << filename << "</p>\n";
     out << "<p><strong>Frequency:</strong> " << filtered_data->frequency << " Hz</p>\n";
     out << "<p><strong>Sample Count:</strong> " << filtered_data->values.size() << "</p>\n";
-    out << "<p><strong>Channels:</strong> " << (filtered_data->values.empty() ? 0 : filtered_data->values.front().channelValues.size()) << "</p>\n";
+    out << "<p><strong>Channels:</strong> " << numChannels << "</p>\n";
+    if (maxSamples < filtered_data->values.size()) {
+        out << "<p><em>Note: Showing first " << maxSamples << " samples for performance</em></p>\n";
+    }
     out << "</div>\n";
     out << "<h2>Baseline Filtering Results</h2>\n";
-    out << "<h3>Filtered Signal Data</h3>\n";
-    out << "<table>\n";
-    out << "<tr><th>Sample</th><th>Time (s)</th>";
-    if (!filtered_data->values.empty()) {
-        for (size_t ch = 0; ch < filtered_data->values.front().channelValues.size(); ++ch) {
-            out << "<th>Channel " << (ch + 1) << "</th>";
-        }
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "<div class=\"chart-container\">\n";
+        out << "<h3>Channel " << (ch + 1) << "</h3>\n";
+        out << "<canvas id=\"chart" << ch << "\"></canvas>\n";
+        out << "</div>\n";
     }
-    out << "</tr>\n";
-    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
-    int rowCount = 0;
-    for (size_t i = 0; i < filtered_data->values.size() && rowCount < 10000; ++i) {
+    
+    out << "<script>\n";
+    out << "const frequency = " << frequency << ";\n";
+    out << "const maxSamples = " << maxSamples << ";\n";
+    out << "const numChannels = " << numChannels << ";\n";
+    out << "const chartData = [];\n";
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "chartData[" << ch << "] = { labels: [], datasets: [{ label: 'Channel " << (ch + 1) << "', data: [], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', borderWidth: 1, pointRadius: 0 }] };\n";
+    }
+    
+    for (size_t i = 0; i < maxSamples; ++i) {
         const auto &sample = filtered_data->values[i];
-        out << "<tr><td>" << static_cast<int>(i) << "</td><td>" << (static_cast<double>(i) / frequency) << "</td>";
-        for (const auto &val : sample.channelValues) {
-            out << "<td>" << val << "</td>";
+        const double time = static_cast<double>(i) / frequency;
+        out << "const time" << i << " = " << time << ";\n";
+        for (size_t ch = 0; ch < numChannels && ch < sample.channelValues.size(); ++ch) {
+            out << "chartData[" << ch << "].labels.push(time" << i << ");\n";
+            out << "chartData[" << ch << "].datasets[0].data.push(" << sample.channelValues[ch] << ");\n";
         }
-        out << "</tr>\n";
-        rowCount++;
     }
-    if (rowCount >= 10000) {
-        out << "<tr><td colspan=\"" << (2 + (filtered_data->values.empty() ? 0 : filtered_data->values.front().channelValues.size())) << "\"><em>... (showing first 10000 samples)</em></td></tr>\n";
-    }
-    out << "</table>\n";
+    
+    out << "for (let ch = 0; ch < numChannels; ch++) {\n";
+    out << "  const ctx = document.getElementById('chart' + ch);\n";
+    out << "  new Chart(ctx, {\n";
+    out << "    type: 'line',\n";
+    out << "    data: chartData[ch],\n";
+    out << "    options: {\n";
+    out << "      responsive: true,\n";
+    out << "      maintainAspectRatio: true,\n";
+    out << "      scales: {\n";
+    out << "        x: { title: { display: true, text: 'Time (s)' } },\n";
+    out << "        y: { title: { display: true, text: 'Amplitude' } }\n";
+    out << "      },\n";
+    out << "      plugins: {\n";
+    out << "        legend: { display: true },\n";
+    out << "        tooltip: { mode: 'index', intersect: false }\n";
+    out << "      }\n";
+    out << "    }\n";
+    out << "  });\n";
+    out << "}\n";
+    out << "</script>\n";
     out << "</body>\n";
     out << "</html>\n";
     file.close();
@@ -369,22 +398,24 @@ bool ResultsRepository::ExportRPeaksHTML(const QString &filepath, const QString 
     QTextStream out(&file);
     out.setRealNumberPrecision(6);
     
+    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
+    const size_t maxSamples = std::min(r_peaks->size(), static_cast<size_t>(50000));
+    const size_t numChannels = r_peaks->empty() ? 0 : r_peaks->front().channelValues.size();
+    
     out << "<!DOCTYPE html>\n";
     out << "<html>\n";
     out << "<head>\n";
     out << "<meta charset=\"UTF-8\">\n";
     out << "<title>EKG Results - R PEAKS</title>\n";
+    out << "<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js\"></script>\n";
     out << "<style>\n";
     out << "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n";
     out << "h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }\n";
     out << "h2 { color: #555; margin-top: 30px; }\n";
-    out << "table { border-collapse: collapse; width: 100%; margin: 20px 0; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n";
-    out << "th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }\n";
-    out << "th { background-color: #4CAF50; color: white; font-weight: bold; }\n";
-    out << "tr:nth-child(even) { background-color: #f9f9f9; }\n";
-    out << "tr:hover { background-color: #f5f5f5; }\n";
+    out << "h3 { color: #666; margin-top: 20px; }\n";
     out << ".info { background-color: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }\n";
-    out << ".peak { background-color: #fff3cd; }\n";
+    out << ".chart-container { background-color: white; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px; }\n";
+    out << "canvas { max-height: 400px; }\n";
     out << "</style>\n";
     out << "</head>\n";
     out << "<body>\n";
@@ -394,9 +425,12 @@ bool ResultsRepository::ExportRPeaksHTML(const QString &filepath, const QString 
     out << "<p><strong>Filename:</strong> " << filename << "</p>\n";
     out << "<p><strong>Frequency:</strong> " << filtered_data->frequency << " Hz</p>\n";
     out << "<p><strong>Sample Count:</strong> " << r_peaks->size() << "</p>\n";
+    if (maxSamples < r_peaks->size()) {
+        out << "<p><em>Note: Showing first " << maxSamples << " samples for performance</em></p>\n";
+    }
     out << "</div>\n";
     out << "<h2>R Peaks Detection Results</h2>\n";
-    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
+    
     if (!r_peaks->empty()) {
         out << "<p><strong>R-peaks detected per channel:</strong></p>\n";
         out << "<ul>\n";
@@ -409,48 +443,65 @@ bool ResultsRepository::ExportRPeaksHTML(const QString &filepath, const QString 
         }
         out << "</ul>\n";
     }
-    out << "<h3>Signal Data with R-Peak Markers</h3>\n";
-    out << "<table>\n";
-    out << "<tr><th>Sample</th><th>Time (s)</th>";
-    if (!r_peaks->empty()) {
-        for (size_t ch = 0; ch < r_peaks->front().channelValues.size(); ++ch) {
-            out << "<th>Channel " << (ch + 1) << "</th>";
-        }
-        for (size_t ch = 0; ch < r_peaks->front().peaks.size(); ++ch) {
-            out << "<th>Peak Ch" << (ch + 1) << "</th>";
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "<div class=\"chart-container\">\n";
+        out << "<h3>Channel " << (ch + 1) << "</h3>\n";
+        out << "<canvas id=\"chart" << ch << "\"></canvas>\n";
+        out << "</div>\n";
+    }
+    
+    out << "<script>\n";
+    out << "const frequency = " << frequency << ";\n";
+    out << "const maxSamples = " << maxSamples << ";\n";
+    out << "const numChannels = " << numChannels << ";\n";
+    out << "const chartData = [];\n";
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "chartData[" << ch << "] = { labels: [], datasets: [\n";
+        out << "  { type: 'line', label: 'Signal', data: [], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', borderWidth: 1, pointRadius: 0 },\n";
+        out << "  { type: 'scatter', label: 'R Peaks', data: [], borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgb(255, 99, 132)', pointRadius: 5, pointHoverRadius: 7 }\n";
+        out << "] };\n";
+    }
+    
+    for (size_t i = 0; i < maxSamples; ++i) {
+        const auto &peak = (*r_peaks)[i];
+        const double time = static_cast<double>(i) / frequency;
+        for (size_t ch = 0; ch < numChannels && ch < peak.channelValues.size(); ++ch) {
+            out << "chartData[" << ch << "].labels.push(" << time << ");\n";
+            out << "chartData[" << ch << "].datasets[0].data.push(" << peak.channelValues[ch] << ");\n";
         }
     }
-    out << "</tr>\n";
-    int rowCount = 0;
-    for (size_t i = 0; i < r_peaks->size() && rowCount < 10000; ++i) {
-        const auto &peak = (*r_peaks)[i];
-        bool hasAnyPeak = false;
-        for (bool p : peak.peaks) {
-            if (p) {
-                hasAnyPeak = true;
-                break;
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        for (size_t i = 0; i < maxSamples; ++i) {
+            const auto &peak = (*r_peaks)[i];
+            if (ch < peak.peaks.size() && peak.peaks[ch] && ch < peak.channelValues.size()) {
+                const double time = static_cast<double>(i) / frequency;
+                out << "chartData[" << ch << "].datasets[1].data.push({x: " << time << ", y: " << peak.channelValues[ch] << "});\n";
             }
         }
-        if (hasAnyPeak) {
-            out << "<tr class=\"peak\">";
-        } else {
-            out << "<tr>";
-        }
-        out << "<td>" << static_cast<int>(i) << "</td><td>" << (static_cast<double>(i) / frequency) << "</td>";
-        for (const auto &val : peak.channelValues) {
-            out << "<td>" << val << "</td>";
-        }
-        for (bool isPeak : peak.peaks) {
-            out << "<td>" << (isPeak ? "Yes" : "No") << "</td>";
-        }
-        out << "</tr>\n";
-        rowCount++;
     }
-    if (rowCount >= 10000) {
-        int colCount = 2 + (r_peaks->empty() ? 0 : (r_peaks->front().channelValues.size() + r_peaks->front().peaks.size()));
-        out << "<tr><td colspan=\"" << colCount << "\"><em>... (showing first 10000 samples)</em></td></tr>\n";
-    }
-    out << "</table>\n";
+    
+    out << "for (let ch = 0; ch < numChannels; ch++) {\n";
+    out << "  const ctx = document.getElementById('chart' + ch);\n";
+    out << "  new Chart(ctx, {\n";
+    out << "    data: chartData[ch],\n";
+    out << "    options: {\n";
+    out << "      responsive: true,\n";
+    out << "      maintainAspectRatio: true,\n";
+    out << "      scales: {\n";
+    out << "        x: { type: 'linear', title: { display: true, text: 'Time (s)' } },\n";
+    out << "        y: { title: { display: true, text: 'Amplitude' } }\n";
+    out << "      },\n";
+    out << "      plugins: {\n";
+    out << "        legend: { display: true },\n";
+    out << "        tooltip: { mode: 'nearest', intersect: false }\n";
+    out << "      }\n";
+    out << "    }\n";
+    out << "  });\n";
+    out << "}\n";
+    out << "</script>\n";
     out << "</body>\n";
     out << "</html>\n";
     file.close();
@@ -1022,23 +1073,24 @@ bool ResultsRepository::ExportWavesHTML(const QString &filepath, const QString &
     QTextStream out(&file);
     out.setRealNumberPrecision(6);
     
+    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
+    const size_t maxSamples = std::min(waves->size(), static_cast<size_t>(50000));
+    const size_t numChannels = waves->empty() ? 0 : waves->front().channelValues.size();
+    
     out << "<!DOCTYPE html>\n";
     out << "<html>\n";
     out << "<head>\n";
     out << "<meta charset=\"UTF-8\">\n";
     out << "<title>EKG Results - WAVES</title>\n";
+    out << "<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js\"></script>\n";
     out << "<style>\n";
     out << "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n";
     out << "h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }\n";
     out << "h2 { color: #555; margin-top: 30px; }\n";
     out << "h3 { color: #666; margin-top: 20px; }\n";
-    out << "table { border-collapse: collapse; width: 100%; margin: 20px 0; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n";
-    out << "th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }\n";
-    out << "th { background-color: #4CAF50; color: white; font-weight: bold; }\n";
-    out << "tr:nth-child(even) { background-color: #f9f9f9; }\n";
-    out << "tr:hover { background-color: #f5f5f5; }\n";
     out << ".info { background-color: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }\n";
-    out << ".marker { background-color: #fff3cd; }\n";
+    out << ".chart-container { background-color: white; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px; }\n";
+    out << "canvas { max-height: 400px; }\n";
     out << "</style>\n";
     out << "</head>\n";
     out << "<body>\n";
@@ -1048,12 +1100,14 @@ bool ResultsRepository::ExportWavesHTML(const QString &filepath, const QString &
     out << "<p><strong>Filename:</strong> " << filename << "</p>\n";
     out << "<p><strong>Frequency:</strong> " << filtered_data->frequency << " Hz</p>\n";
     out << "<p><strong>Sample Count:</strong> " << waves->size() << "</p>\n";
+    if (maxSamples < waves->size()) {
+        out << "<p><em>Note: Showing first " << maxSamples << " samples for performance</em></p>\n";
+    }
     out << "</div>\n";
     out << "<h2>Wave Detection Summary</h2>\n";
     if (!waves->empty()) {
         out << "<p><strong>Wave markers detected per channel:</strong></p>\n";
-        out << "<table>\n";
-        out << "<tr><th>Channel</th><th>P Onset</th><th>P End</th><th>QRS Onset</th><th>QRS End</th><th>T End</th></tr>\n";
+        out << "<ul>\n";
         for (size_t ch = 0; ch < waves->front().p_wave_onset.size(); ++ch) {
             int pOnsetCount = 0, pEndCount = 0, qrsOnsetCount = 0, qrsEndCount = 0, tEndCount = 0;
             for (const auto &wave : *waves) {
@@ -1063,75 +1117,87 @@ bool ResultsRepository::ExportWavesHTML(const QString &filepath, const QString &
                 if (ch < wave.qrs_end.size() && wave.qrs_end[ch]) qrsEndCount++;
                 if (ch < wave.t_end.size() && wave.t_end[ch]) tEndCount++;
             }
-            out << "<tr><td>Channel " << (ch + 1) << "</td>";
-            out << "<td>" << pOnsetCount << "</td>";
-            out << "<td>" << pEndCount << "</td>";
-            out << "<td>" << qrsOnsetCount << "</td>";
-            out << "<td>" << qrsEndCount << "</td>";
-            out << "<td>" << tEndCount << "</td></tr>\n";
+            out << "<li>Channel " << (ch + 1) << ": P Onset=" << pOnsetCount << ", P End=" << pEndCount << ", QRS Onset=" << qrsOnsetCount << ", QRS End=" << qrsEndCount << ", T End=" << tEndCount << "</li>\n";
         }
-        out << "</table>\n";
+        out << "</ul>\n";
     }
-    out << "<h3>Signal Data with Wave Markers</h3>\n";
-    out << "<table>\n";
-    out << "<tr><th>Sample</th><th>Time (s)</th>";
-    if (!waves->empty()) {
-        for (size_t ch = 0; ch < waves->front().channelValues.size(); ++ch) {
-            out << "<th>Channel " << (ch + 1) << "</th>";
-        }
-        for (size_t ch = 0; ch < waves->front().p_wave_onset.size(); ++ch) {
-            out << "<th>P_Onset_Ch" << (ch + 1) << "</th>";
-            out << "<th>P_End_Ch" << (ch + 1) << "</th>";
-            out << "<th>QRS_Onset_Ch" << (ch + 1) << "</th>";
-            out << "<th>QRS_End_Ch" << (ch + 1) << "</th>";
-            out << "<th>T_End_Ch" << (ch + 1) << "</th>";
-        }
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "<div class=\"chart-container\">\n";
+        out << "<h3>Channel " << (ch + 1) << "</h3>\n";
+        out << "<canvas id=\"chart" << ch << "\"></canvas>\n";
+        out << "</div>\n";
     }
-    out << "</tr>\n";
-    const double frequency = filtered_data->frequency > 0 ? static_cast<double>(filtered_data->frequency) : 1.0;
-    int rowCount = 0;
-    for (size_t i = 0; i < waves->size() && rowCount < 10000; ++i) {
+    
+    out << "<script>\n";
+    out << "const frequency = " << frequency << ";\n";
+    out << "const maxSamples = " << maxSamples << ";\n";
+    out << "const numChannels = " << numChannels << ";\n";
+    out << "const chartData = [];\n";
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        out << "chartData[" << ch << "] = { labels: [], datasets: [\n";
+        out << "  { type: 'line', label: 'Signal', data: [], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.2)', borderWidth: 1, pointRadius: 0 },\n";
+        out << "  { type: 'scatter', label: 'P Onset', data: [], borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgb(255, 99, 132)', pointRadius: 4, pointHoverRadius: 6 },\n";
+        out << "  { type: 'scatter', label: 'P End', data: [], borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgb(54, 162, 235)', pointRadius: 4, pointHoverRadius: 6 },\n";
+        out << "  { type: 'scatter', label: 'QRS Onset', data: [], borderColor: 'rgb(255, 206, 86)', backgroundColor: 'rgb(255, 206, 86)', pointRadius: 4, pointHoverRadius: 6 },\n";
+        out << "  { type: 'scatter', label: 'QRS End', data: [], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgb(75, 192, 192)', pointRadius: 4, pointHoverRadius: 6 },\n";
+        out << "  { type: 'scatter', label: 'T End', data: [], borderColor: 'rgb(153, 102, 255)', backgroundColor: 'rgb(153, 102, 255)', pointRadius: 4, pointHoverRadius: 6 }\n";
+        out << "] };\n";
+    }
+    
+    for (size_t i = 0; i < maxSamples; ++i) {
         const auto &wave = (*waves)[i];
-        bool hasMarker = false;
-        for (size_t ch = 0; ch < wave.p_wave_onset.size(); ++ch) {
-            if ((ch < wave.p_wave_onset.size() && wave.p_wave_onset[ch]) ||
-                (ch < wave.p_wave_end.size() && wave.p_wave_end[ch]) ||
-                (ch < wave.qrs_onset.size() && wave.qrs_onset[ch]) ||
-                (ch < wave.qrs_end.size() && wave.qrs_end[ch]) ||
-                (ch < wave.t_end.size() && wave.t_end[ch])) {
-                hasMarker = true;
-                break;
+        const double time = static_cast<double>(i) / frequency;
+        for (size_t ch = 0; ch < numChannels && ch < wave.channelValues.size(); ++ch) {
+            out << "chartData[" << ch << "].labels.push(" << time << ");\n";
+            out << "chartData[" << ch << "].datasets[0].data.push(" << wave.channelValues[ch] << ");\n";
+        }
+    }
+    
+    for (size_t ch = 0; ch < numChannels; ++ch) {
+        for (size_t i = 0; i < maxSamples; ++i) {
+            const auto &wave = (*waves)[i];
+            if (ch < wave.channelValues.size()) {
+                const double time = static_cast<double>(i) / frequency;
+                if (ch < wave.p_wave_onset.size() && wave.p_wave_onset[ch]) {
+                    out << "chartData[" << ch << "].datasets[1].data.push({x: " << time << ", y: " << wave.channelValues[ch] << "});\n";
+                }
+                if (ch < wave.p_wave_end.size() && wave.p_wave_end[ch]) {
+                    out << "chartData[" << ch << "].datasets[2].data.push({x: " << time << ", y: " << wave.channelValues[ch] << "});\n";
+                }
+                if (ch < wave.qrs_onset.size() && wave.qrs_onset[ch]) {
+                    out << "chartData[" << ch << "].datasets[3].data.push({x: " << time << ", y: " << wave.channelValues[ch] << "});\n";
+                }
+                if (ch < wave.qrs_end.size() && wave.qrs_end[ch]) {
+                    out << "chartData[" << ch << "].datasets[4].data.push({x: " << time << ", y: " << wave.channelValues[ch] << "});\n";
+                }
+                if (ch < wave.t_end.size() && wave.t_end[ch]) {
+                    out << "chartData[" << ch << "].datasets[5].data.push({x: " << time << ", y: " << wave.channelValues[ch] << "});\n";
+                }
             }
         }
-        if (hasMarker) {
-            out << "<tr class=\"marker\">";
-        } else {
-            out << "<tr>";
-        }
-        out << "<td>" << static_cast<int>(i) << "</td><td>" << (static_cast<double>(i) / frequency) << "</td>";
-        for (const auto &val : wave.channelValues) {
-            out << "<td>" << val << "</td>";
-        }
-        for (size_t ch = 0; ch < wave.p_wave_onset.size(); ++ch) {
-            bool pOnset = wave.p_wave_onset[ch];
-            bool pEnd = ch < wave.p_wave_end.size() ? wave.p_wave_end[ch] : false;
-            bool qrsOnset = ch < wave.qrs_onset.size() ? wave.qrs_onset[ch] : false;
-            bool qrsEnd = ch < wave.qrs_end.size() ? wave.qrs_end[ch] : false;
-            bool tEnd = ch < wave.t_end.size() ? wave.t_end[ch] : false;
-            out << "<td>" << (pOnset ? "Yes" : "No") << "</td>";
-            out << "<td>" << (pEnd ? "Yes" : "No") << "</td>";
-            out << "<td>" << (qrsOnset ? "Yes" : "No") << "</td>";
-            out << "<td>" << (qrsEnd ? "Yes" : "No") << "</td>";
-            out << "<td>" << (tEnd ? "Yes" : "No") << "</td>";
-        }
-        out << "</tr>\n";
-        rowCount++;
     }
-    if (rowCount >= 10000) {
-        int colCount = 2 + (waves->empty() ? 0 : (waves->front().channelValues.size() + waves->front().p_wave_onset.size() * 5));
-        out << "<tr><td colspan=\"" << colCount << "\"><em>... (showing first 10000 samples)</em></td></tr>\n";
-    }
-    out << "</table>\n";
+    
+    out << "for (let ch = 0; ch < numChannels; ch++) {\n";
+    out << "  const ctx = document.getElementById('chart' + ch);\n";
+    out << "  new Chart(ctx, {\n";
+    out << "    data: chartData[ch],\n";
+    out << "    options: {\n";
+    out << "      responsive: true,\n";
+    out << "      maintainAspectRatio: true,\n";
+    out << "      scales: {\n";
+    out << "        x: { type: 'linear', title: { display: true, text: 'Time (s)' } },\n";
+    out << "        y: { title: { display: true, text: 'Amplitude' } }\n";
+    out << "      },\n";
+    out << "      plugins: {\n";
+    out << "        legend: { display: true },\n";
+    out << "        tooltip: { mode: 'nearest', intersect: false }\n";
+    out << "      }\n";
+    out << "    }\n";
+    out << "  });\n";
+    out << "}\n";
+    out << "</script>\n";
     out << "</body>\n";
     out << "</html>\n";
     file.close();
