@@ -104,6 +104,12 @@ bool ApplicationService::RunFiltering(FilterMethod method, int windowSize, int p
         this->filtered_dataset->values = this->moving_average_filter_service_->Filter(this->loaded_dataset->values, windowSize, polynomialOrder);
     } else if (method == SavitzkyGolay) {
         this->filtered_dataset->values = this->savitzky_golay_filter_service_->Filter(this->loaded_dataset->values, windowSize, polynomialOrder);
+    } else {
+        return false;
+    }
+    
+    if (this->filtered_dataset->values.empty()) {
+        return false;
     }
     
     return true;

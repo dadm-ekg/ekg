@@ -1497,7 +1497,7 @@ ApplicationWindow {
                                     if (lastUsedFilter !== "") {
                                         return "Przefiltrowano z użyciem " + lastUsedFilter
                                     } else {
-                                        return "Skonczono"
+                                        return "Skończono"
                                     }
                                 }
                             } else if (module === "R PEAKS") {
@@ -1513,7 +1513,7 @@ ApplicationWindow {
                                     if (lastUsedRPeaksMethod !== "") {
                                         return "Wykryto piki R metodą " + lastUsedRPeaksMethod
                                     } else {
-                                        return "Skonczono"
+                                        return "Skończono"
                                     }
                                 }
                             } else if (module === "HRV TIME") {
@@ -1527,9 +1527,9 @@ ApplicationWindow {
                                     return "Gotowy"
                                 } else {
                                     if (lastUsedHRVTimeMethod !== "") {
-                                        return "Obliczono metoda " + lastUsedHRVTimeMethod
+                                        return "Obliczono metodą " + lastUsedHRVTimeMethod
                                     } else {
-                                        return "Skonczono"
+                                        return "Skończono"
                                     }
                                 }
                             } else if (module === "HRV GEO") {
