@@ -258,28 +258,26 @@ ApplicationWindow {
             var histogram = ekgController.getHRVGeoHistogram()
             console.log("HRV GEO histogram length:", histogram ? histogram.length : 0)
             if (histogram && histogram.length > 0) {
-                histogramLineSeries.clear()
+                while (histogramBarSet.count > 0) {
+                    histogramBarSet.remove(0)
+                }
                 var maxCount = 0
-                var minRR = Infinity
-                var maxRR = 0
+                var categories = []
                 for (var k = 0; k < histogram.length; k++) {
                     var h = histogram[k]
                     if (h) {
                         var xVal = h.x !== undefined ? h.x : h["x"]
                         var yVal = h.y !== undefined ? h.y : h["y"]
                         if (xVal !== undefined && yVal !== undefined) {
-                            histogramLineSeries.append(xVal, yVal)
+                            histogramBarSet.append(yVal)
+                            categories.push(xVal.toFixed(0))
                             if (yVal > maxCount) maxCount = yVal
-                            if (xVal < minRR) minRR = xVal
-                            if (xVal > maxRR) maxRR = xVal
                         }
                     }
                 }
-                console.log("HRV GEO histogram points:", histogramLineSeries.count, "maxCount:", maxCount)
-                if (histogramLineSeries.count > 0) {
-                    var margin = (maxRR - minRR) * 0.05
-                    hrvGeoHistogramAxisX.min = minRR - margin
-                    hrvGeoHistogramAxisX.max = maxRR + margin
+                hrvGeoHistogramAxisX.categories = categories
+                console.log("HRV GEO histogram bars:", histogramBarSet.count, "maxCount:", maxCount)
+                if (histogramBarSet.count > 0) {
                     hrvGeoHistogramAxisY.max = maxCount * 1.1
                     hrvGeoHistogramAxisY.min = 0
                 }
@@ -1284,10 +1282,11 @@ ApplicationWindow {
                                     backgroundColor: vizBg
                                     legend.visible: false
 
-                                    ValueAxis {
+                                    BarCategoryAxis {
                                         id: hrvGeoHistogramAxisX
                                         titleText: "RR [ms]"
                                         labelsColor: textSecondary
+                                        labelsAngle: -45
                                     }
 
                                     ValueAxis {
@@ -1296,16 +1295,16 @@ ApplicationWindow {
                                         labelsColor: textSecondary
                                     }
 
-                                    AreaSeries {
-                                        id: histogramAreaSeries
+                                    BarSeries {
+                                        id: histogramBarSeries
                                         axisX: hrvGeoHistogramAxisX
                                         axisY: hrvGeoHistogramAxisY
-                                        color: "#10b981"
-                                        borderColor: "#059669"
-                                        borderWidth: 2
+                                        barWidth: 0.9
                                         
-                                        upperSeries: LineSeries {
-                                            id: histogramLineSeries
+                                        BarSet {
+                                            id: histogramBarSet
+                                            label: "RR"
+                                            color: "#10b981"
                                         }
                                     }
                                 }
