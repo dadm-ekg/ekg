@@ -18,6 +18,7 @@ class ApplicationService : public IApplicationService {
     std::shared_ptr<ISignalRepository> signal_repository_;
     std::shared_ptr<IFilterService> butterworth_filter_service_;
     std::shared_ptr<IFilterService> moving_average_filter_service_;
+    std::shared_ptr<IFilterService> savitzky_golay_filter_service_;
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service_;
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service_;
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service_;
@@ -37,6 +38,7 @@ public:
         std::shared_ptr<ISignalRepository> signal_repository,
         std::shared_ptr<IFilterService> butterworth_filter_service,
         std::shared_ptr<IFilterService> moving_average_filter_service,
+        std::shared_ptr<IFilterService> savitzky_golay_filter_service,
         std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
         std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
         std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
@@ -58,7 +60,7 @@ public:
 
     std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint> > GetWaves() const override;
 
-    bool RunFiltering(FilterMethod method) const override;
+    bool RunFiltering(FilterMethod method, int windowSize = 5, int polynomialOrder = 2) const override;
 
     void ClearFilteredData() const override;
 

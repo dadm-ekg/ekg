@@ -1870,9 +1870,13 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 8
 
+            property int windowSize: 5
+            property int polynomialOrder: 2
+
             Component.onCompleted: {
                 if (window.selectedFilterMethod === 0) rbMovingAverage.checked = true
                 else if (window.selectedFilterMethod === 1) rbButterworth.checked = true
+                else if (window.selectedFilterMethod === 2) rbSavitzkyGolay.checked = true
             }
 
             function isReady() {
@@ -1895,10 +1899,13 @@ ApplicationWindow {
 
                 if (rbMovingAverage.checked) {
                     window.selectedFilterMethod = 0
-                    ekgController.runBaseline(0)
+                    ekgController.runBaseline(0, windowSize, polynomialOrder)
                 } else if (rbButterworth.checked) {
                     window.selectedFilterMethod = 1
-                    ekgController.runBaseline(1)
+                    ekgController.runBaseline(1, windowSize, polynomialOrder)
+                } else if (rbSavitzkyGolay.checked) {
+                    window.selectedFilterMethod = 2
+                    ekgController.runBaseline(2, windowSize, polynomialOrder)
                 }
             }
 
@@ -1926,6 +1933,70 @@ ApplicationWindow {
                 ButtonGroup.group: filterGroup
                 leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 1
+            }
+
+            RadioButton {
+                id: rbSavitzkyGolay
+                text: "Savitzky-Golay"
+                ButtonGroup.group: filterGroup
+                leftPadding: 16
+                onCheckedChanged: if (checked) window.selectedFilterMethod = 2
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: borderColor
+                opacity: rbMovingAverage.checked || rbSavitzkyGolay.checked ? 1 : 0
+                Layout.topMargin: 8
+                Layout.bottomMargin: 8
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                visible: rbMovingAverage.checked || rbSavitzkyGolay.checked
+                spacing: 8
+
+                Label {
+                    text: "Rozmiar okna:"
+                    color: textSecondary
+                    font.pixelSize: 13
+                }
+
+                SpinBox {
+                    id: windowSizeSpinBox
+                    from: 3
+                    to: 51
+                    stepSize: 2
+                    value: baselineRoot.windowSize
+                    onValueChanged: {
+                        var val = value
+                        if (val % 2 === 0) val++
+                        baselineRoot.windowSize = val
+                    }
+                    editable: true
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                visible: rbSavitzkyGolay.checked
+                spacing: 8
+
+                Label {
+                    text: "Stopień wielomianu:"
+                    color: textSecondary
+                    font.pixelSize: 13
+                }
+
+                SpinBox {
+                    id: polynomialOrderSpinBox
+                    from: 1
+                    to: 10
+                    value: baselineRoot.polynomialOrder
+                    onValueChanged: baselineRoot.polynomialOrder = value
+                    editable: true
+                }
             }
         }
     }

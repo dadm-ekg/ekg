@@ -12,6 +12,7 @@ ApplicationService::ApplicationService(
     std::shared_ptr<ISignalRepository> signal_repository,
     std::shared_ptr<IFilterService> butterworth_filter_service,
     std::shared_ptr<IFilterService> moving_average_filter_service,
+    std::shared_ptr<IFilterService> savitzky_golay_filter_service,
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
@@ -21,6 +22,7 @@ ApplicationService::ApplicationService(
     : signal_repository_(std::move(signal_repository)),
       butterworth_filter_service_(std::move(butterworth_filter_service)),
       moving_average_filter_service_(std::move(moving_average_filter_service)),
+      savitzky_golay_filter_service_(std::move(savitzky_golay_filter_service)),
       r_peaks_detection_service_(std::move(r_peaks_detection_service)),
       hrv_time_processing_service_(std::move(hrv_time_processing_service)),
       hrv_geo_processing_service_(std::move(hrv_geo_processing_service)),
@@ -87,7 +89,7 @@ std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint> > ApplicationService::
     return this->waves;
 }
 
-bool ApplicationService::RunFiltering(FilterMethod method) const {
+bool ApplicationService::RunFiltering(FilterMethod method, int windowSize, int polynomialOrder) const {
     if (this->loaded_dataset == nullptr) return false;
     
     this->filtered_dataset = std::make_shared<SignalDataset>();
@@ -97,9 +99,11 @@ bool ApplicationService::RunFiltering(FilterMethod method) const {
     this->heart_class_result_ = HeartClassResult{};
     
     if (method == Butterworth) {
-        this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values);
+        this->filtered_dataset->values = this->butterworth_filter_service_->Filter(this->loaded_dataset->values, windowSize, polynomialOrder);
     } else if (method == MovingAverage) {
-        this->filtered_dataset->values = this->moving_average_filter_service_->Filter(this->loaded_dataset->values);
+        this->filtered_dataset->values = this->moving_average_filter_service_->Filter(this->loaded_dataset->values, windowSize, polynomialOrder);
+    } else if (method == SavitzkyGolay) {
+        this->filtered_dataset->values = this->savitzky_golay_filter_service_->Filter(this->loaded_dataset->values, windowSize, polynomialOrder);
     }
     
     return true;

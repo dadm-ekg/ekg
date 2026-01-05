@@ -166,7 +166,7 @@ void EkgController::openFileDialog() {
     }
 }
 
-bool EkgController::runBaseline(int filterMethod) {
+bool EkgController::runBaseline(int filterMethod, int windowSize, int polynomialOrder) {
     if (!hasData()) {
         emit filteringError("Nie załadowano danych. Najpierw zaimportuj sygnał.");
         return false;
@@ -188,7 +188,7 @@ bool EkgController::runBaseline(int filterMethod) {
             return false;
     }
 
-    QMetaObject::invokeMethod(analysis_worker_, "runBaseline", Qt::QueuedConnection, Q_ARG(FilterMethod, method));
+    QMetaObject::invokeMethod(analysis_worker_, "runBaseline", Qt::QueuedConnection, Q_ARG(FilterMethod, method), Q_ARG(int, windowSize), Q_ARG(int, polynomialOrder));
     return true;
 }
 

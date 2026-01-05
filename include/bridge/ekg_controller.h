@@ -37,7 +37,7 @@ public:
 
     Q_INVOKABLE void loadData(const QString &filename);
     Q_INVOKABLE void openFileDialog();
-    Q_INVOKABLE bool runBaseline(int filterMethod);
+    Q_INVOKABLE bool runBaseline(int filterMethod, int windowSize = 5, int polynomialOrder = 2);
     Q_INVOKABLE bool runRPeaksDetection(int method);
     Q_INVOKABLE bool runHRVTime(int method);
     Q_INVOKABLE bool runHRVGeo();

@@ -4,7 +4,7 @@ AnalysisWorker::AnalysisWorker(std::shared_ptr<IApplicationService> application_
     : QObject(parent), application_service_(std::move(application_service)) {
 }
 
-void AnalysisWorker::runBaseline(FilterMethod filterMethod) {
+void AnalysisWorker::runBaseline(FilterMethod filterMethod, int windowSize, int polynomialOrder) {
     QString filterName;
     bool success = false;
     QString errorMessage;
@@ -12,15 +12,15 @@ void AnalysisWorker::runBaseline(FilterMethod filterMethod) {
     switch (filterMethod) {
         case MovingAverage:
             filterName = "Moving Average";
-            success = application_service_->RunFiltering(MovingAverage);
+            success = application_service_->RunFiltering(MovingAverage, windowSize, polynomialOrder);
             break;
         case Butterworth:
             filterName = "Butterworth";
-            success = application_service_->RunFiltering(Butterworth);
+            success = application_service_->RunFiltering(Butterworth, windowSize, polynomialOrder);
             break;
         case SavitzkyGolay:
-            errorMessage = "Filtr Savitzky-Golay nie jest jeszcze zaimplementowany";
-            success = false;
+            filterName = "Savitzky-Golay";
+            success = application_service_->RunFiltering(SavitzkyGolay, windowSize, polynomialOrder);
             break;
         default:
             errorMessage = "Nieznany typ filtra";

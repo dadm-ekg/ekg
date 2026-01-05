@@ -18,7 +18,7 @@ public:
     explicit AnalysisWorker(std::shared_ptr<IApplicationService> application_service, QObject *parent = nullptr);
 
 public slots:
-    void runBaseline(FilterMethod filterMethod);
+    void runBaseline(FilterMethod filterMethod, int windowSize, int polynomialOrder);
     void runRPeaksDetection(RPeaksDetectionMethod method);
     void runHRVTime(HRVSpectralMethod method);
     void runHRVGeo();

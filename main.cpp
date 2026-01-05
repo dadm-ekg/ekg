@@ -9,6 +9,7 @@
 #include "include/repository/results_repository.h"
 #include "include/service/butterworth_filter_service.h"
 #include "include/service/moving_average_filter_service.h"
+#include "include/service/savitzky_golay_filter_service.h"
 #include "include/service/r_peaks_detection_service.h"
 #include "include/service/hrv_time_processing_service.h"
 #include "include/service/hrv_geo_processing_service.h"
@@ -22,6 +23,7 @@ int main(int argc, char *argv[])
     auto signal_repository = std::make_shared<DATSignalRepository>();
     auto butterworth_filter_service = std::make_shared<ButterworthFilterService>();
     auto moving_average_filter_service = std::make_shared<MovingAverageFilterService>();
+    auto savitzky_golay_filter_service = std::make_shared<SavitzkyGolayFilterService>();
     auto r_peaks_detection_service = std::make_shared<RPeaksDetectionService>();
     auto hrv_time_processing_service = std::make_shared<HRVTimeProcessingService>();
     auto hrv_geo_processing_service = std::make_shared<HRVGeoProcessingService>();
@@ -32,6 +34,7 @@ int main(int argc, char *argv[])
         signal_repository,
         butterworth_filter_service,
         moving_average_filter_service,
+        savitzky_golay_filter_service,
         r_peaks_detection_service,
         hrv_time_processing_service,
         hrv_geo_processing_service,

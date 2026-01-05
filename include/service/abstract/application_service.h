@@ -30,7 +30,7 @@ public:
 
     virtual std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint> > GetWaves() const = 0;
 
-    virtual bool RunFiltering(FilterMethod method) const = 0;
+    virtual bool RunFiltering(FilterMethod method, int windowSize = 5, int polynomialOrder = 2) const = 0;
 
     virtual void ClearFilteredData() const = 0;
 
