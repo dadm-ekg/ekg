@@ -890,7 +890,7 @@ ApplicationWindow {
                                 antialiasing: true
                                 theme: isDarkTheme ? ChartView.ChartThemeDark : ChartView.ChartThemeLight
                                 backgroundColor: vizBg
-                                legend.visible: true
+                                legend.visible: window.currentModule !== "WAVES"
                                 legend.alignment: Qt.AlignTop
                                 legend.labelColor: textSecondary
                                 enabled: ekgController.hasData
@@ -2440,12 +2440,95 @@ ApplicationWindow {
                 }
             }
 
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
+                height: 1
+                color: borderColor
+                opacity: ekgController.wavesCompleted ? 1 : 0
                 Layout.topMargin: 8
-                Layout.preferredHeight: 0
-                Layout.minimumHeight: 0
-                Layout.maximumHeight: 0
+                Layout.bottomMargin: 8
+            }
+
+            ColumnLayout {
+                visible: window.currentModule === "WAVES" && ekgController.wavesCompleted
+                Layout.fillWidth: true
+                spacing: 4
+
+                Label {
+                    text: "Legenda:"
+                    font.bold: true
+                    font.pixelSize: 14
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        color: "#f59e0b"
+                    }
+                    Label {
+                        text: "P onset"
+                        font.pixelSize: 12
+                    }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        color: "#eab308"
+                    }
+                    Label {
+                        text: "P end"
+                        font.pixelSize: 12
+                    }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        color: "#8b5cf6"
+                    }
+                    Label {
+                        text: "QRS onset"
+                        font.pixelSize: 12
+                    }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        color: "#a78bfa"
+                    }
+                    Label {
+                        text: "QRS end"
+                        font.pixelSize: 12
+                    }
+                }
+
+                RowLayout {
+                    spacing: 8
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: 6
+                        color: "#ec4899"
+                    }
+                    Label {
+                        text: "T end"
+                        font.pixelSize: 12
+                    }
+                }
             }
         }
     }
