@@ -44,7 +44,11 @@ void EkgController::loadData(const QString &filename) {
         emit heartClassCompletedChanged();
         emit fileLoadSuccess(filename);
     } else {
-        emit fileLoadError("Nie udało się załadować pliku");
+        QString errorMessage = application_service_->GetLastValidationError();
+        if (errorMessage.isEmpty()) {
+            errorMessage = "Nie udało się załadować pliku";
+        }
+        emit fileLoadError(errorMessage);
     }
 }
 

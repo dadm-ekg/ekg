@@ -25,6 +25,7 @@ class ApplicationService : public IApplicationService {
     std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service_;
 
     QString loaded_filename;
+    QString last_validation_error_;
     std::shared_ptr<SignalDataset> loaded_dataset;
     mutable std::shared_ptr<SignalDataset> filtered_dataset;
     mutable std::shared_ptr<std::vector<RPeaksAnnotatedSignalDatapoint> > r_peaks;
@@ -72,6 +73,8 @@ public:
     bool CalculateWaves() const override;
 
     HeartClassResult CalculateHeartClass() const override;
+    
+    QString GetLastValidationError() const override;
 };
 
 #endif

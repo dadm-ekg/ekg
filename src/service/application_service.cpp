@@ -5,6 +5,8 @@
 
 #include "../../include/dto/filter_method.h"
 #include "../../include/service/r_peaks_detection_service.h"
+#include "../../include/repository/dat_signal_repository.h"
+#include "../../include/dto/validation_result.h"
 
 ApplicationService::ApplicationService(
     std::shared_ptr<ISignalRepository> signal_repository,
@@ -27,7 +29,31 @@ ApplicationService::ApplicationService(
 }
 
 bool ApplicationService::Load(const QString &filename) {
+    last_validation_error_ = "";
+    
     this->loaded_dataset = signal_repository_->Load(filename);
+    
+    auto* datRepo = dynamic_cast<DATSignalRepository*>(signal_repository_.get());
+    if (datRepo) {
+        ValidationResult validation = datRepo->GetLastValidationResult();
+        if (!validation.isValid) {
+            last_validation_error_ = validation.getFormattedErrors();
+        }
+    }
+    
+    if (!this->loaded_dataset || this->loaded_dataset->values.empty()) {
+        this->loaded_dataset = nullptr;
+        this->filtered_dataset = nullptr;
+        this->r_peaks = nullptr;
+        this->waves = nullptr;
+        this->heart_class_result_ = HeartClassResult{};
+        this->loaded_filename = "";
+        if (last_validation_error_.isEmpty()) {
+            last_validation_error_ = "Nie udało się załadować danych z pliku";
+        }
+        return false;
+    }
+    
     this->filtered_dataset = nullptr;
     this->r_peaks = nullptr;
     this->waves = nullptr;
@@ -150,4 +176,8 @@ HeartClassResult ApplicationService::CalculateHeartClass() const {
     );
     
     return heart_class_result_;
+}
+
+QString ApplicationService::GetLastValidationError() const {
+    return last_validation_error_;
 }

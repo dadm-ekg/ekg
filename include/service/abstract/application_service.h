@@ -45,6 +45,8 @@ public:
     virtual bool CalculateWaves() const = 0;
 
     virtual HeartClassResult CalculateHeartClass() const = 0;
+    
+    virtual QString GetLastValidationError() const = 0;
 };
 
 #endif

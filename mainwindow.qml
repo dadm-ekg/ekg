@@ -505,6 +505,8 @@ ApplicationWindow {
     header: ToolBar {
         leftPadding: 8
         rightPadding: 8
+        topPadding: 0
+        bottomPadding: 0
         RowLayout {
             anchors.fill: parent
             spacing: 16
@@ -659,7 +661,7 @@ ApplicationWindow {
     RowLayout {
         anchors.fill: parent
         anchors.margins: 16
-        anchors.topMargin: header.height
+        anchors.topMargin: header.height + 16
         spacing: 16
 
         Frame {
