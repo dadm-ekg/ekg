@@ -516,6 +516,7 @@ ApplicationWindow {
                 font.pixelSize: 22
                 font.bold: true
                 Layout.alignment: Qt.AlignVCenter
+                Layout.leftMargin: 16
             }
 
             Item { Layout.fillWidth: true }
@@ -1356,7 +1357,7 @@ ApplicationWindow {
 
                 Label {
                     visible: !ekgController.hasData && window.currentModule === "ECG BASELINE"
-                    text: "⚠️ Najpierw zaimportuj sygnal EKG"
+                    text: "⚠️ Najpierw zaimportuj sygnał EKG"
                     color: Material.color(Material.Orange)
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
@@ -1372,7 +1373,7 @@ ApplicationWindow {
 
                 Label {
                     visible: !ekgController.rPeaksCompleted && window.currentModule === "HRV TIME"
-                    text: "⚠️ Najpierw uruchom detekcje pikow R"
+                    text: "⚠️ Najpierw uruchom detekcję pików R"
                     color: Material.color(Material.Orange)
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
@@ -1380,7 +1381,7 @@ ApplicationWindow {
 
                 Label {
                     visible: !ekgController.rPeaksCompleted && window.currentModule === "HRV GEO"
-                    text: "⚠️ Najpierw uruchom detekcje pikow R"
+                    text: "⚠️ Najpierw uruchom detekcję pików R"
                     color: Material.color(Material.Orange)
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
@@ -1426,7 +1427,7 @@ ApplicationWindow {
                                     return "Gotowy"
                                 } else {
                                     if (lastUsedFilter !== "") {
-                                        return "Przefiltrowano z uzyciem " + lastUsedFilter
+                                        return "Przefiltrowano z użyciem " + lastUsedFilter
                                     } else {
                                         return "Skonczono"
                                     }
@@ -1442,7 +1443,7 @@ ApplicationWindow {
                                     return "Gotowy"
                                 } else {
                                     if (lastUsedRPeaksMethod !== "") {
-                                        return "Wykryto piki R metoda " + lastUsedRPeaksMethod
+                                        return "Wykryto piki R metodą " + lastUsedRPeaksMethod
                                     } else {
                                         return "Skonczono"
                                     }
@@ -1898,7 +1899,7 @@ ApplicationWindow {
             }
 
                 Label {
-                text: "Wybierz metode detekcji:"
+                text: "Wybierz metodę detekcji:"
                     color: textSecondary
                 font.pixelSize: 13
                 }
@@ -2059,7 +2060,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Metryki czestotliwosciowe:"
+                    text: "Metryki częstotliwościowe:"
                     font.bold: true
                     font.pixelSize: 14
                     Layout.columnSpan: 2
@@ -2137,7 +2138,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "Metryki trojkatne:"
+                    text: "Metryki trójkątne:"
                     font.bold: true
                     font.pixelSize: 14
                     Layout.columnSpan: 2
@@ -2156,7 +2157,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Metryki Poincare:"
+                    text: "Metryki Poincaré:"
                     font.bold: true
                     font.pixelSize: 14
                     Layout.columnSpan: 2
@@ -2480,7 +2481,7 @@ ApplicationWindow {
 
     Dialog {
         id: helpDialog
-        title: "Jak korzystac z EKG Analyzer"
+        title: "Jak korzystać z EKG Analyzer"
         modal: true
         standardButtons: Dialog.Ok
         implicitWidth: 420
@@ -2497,10 +2498,10 @@ ApplicationWindow {
 
             Label {
                 leftPadding: 8
-                text: "1. Wybierz plik EKG (Import sygnalu).\n" +
-                      "2. Wybierz modul analizy (ECG BASELINE, R PEAKS, WAVES, HRV TIME, HRV GEO lub HEART CLASS).\n" +
+                text: "1. Wybierz plik EKG (Import sygnału).\n" +
+                      "2. Wybierz moduł analizy (ECG BASELINE, R PEAKS, WAVES, HRV TIME, HRV GEO lub HEART CLASS).\n" +
                       "3. Ustaw parametry w prawym panelu.\n" +
-                      "4. Kliknij 'Uruchom analize', aby przetworzyc sygnal.\n\n"
+                      "4. Kliknij 'Uruchom analizę', aby przetworzyć sygnał.\n\n"
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -2619,7 +2620,7 @@ ApplicationWindow {
             spacing: 8
 
             Label {
-                text: "Czy na pewno chcesz zaladowac plik " + pendingFileName + "?"
+                text: "Czy na pewno chcesz załadować plik " + pendingFileName + "?"
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
