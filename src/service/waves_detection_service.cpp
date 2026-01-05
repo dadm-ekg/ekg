@@ -1,5 +1,4 @@
 #include "../../include/service/waves_detection_service.h"
-#include "../../include/service/butterworth_filter_service.h"
 #include "../../include/service/moving_average_filter_service.h"
 
 #include <vector>
@@ -206,16 +205,12 @@ std::vector<WaveAnnotatedSignalDatapoint> WavesDetectionService::Detect(const st
     const size_t num_channels = datapoints[0].channelValues.size();
     if (num_channels == 0) return {};
 
-    ButterworthFilterService butterworthFilter;
     MovingAverageFilterService movingAvgFilter;
-
-    auto filteredPoints = butterworthFilter.Filter(datapoints);
-    auto smoothedPoints = movingAvgFilter.Filter(filteredPoints);
+    auto smoothedPoints = movingAvgFilter.Filter(datapoints, 5, 0);
 
     std::vector<WaveAnnotatedSignalDatapoint> result;
     result.reserve(datapoints.size());
 
-    // Initialize result with channel values
     for (size_t i = 0; i < datapoints.size(); ++i) {
         WaveAnnotatedSignalDatapoint wp;
         wp.channelValues = datapoints[i].channelValues;
@@ -227,14 +222,13 @@ std::vector<WaveAnnotatedSignalDatapoint> WavesDetectionService::Detect(const st
         result.push_back(wp);
     }
 
-    // Analyze each channel separately
     for (size_t ch = 0; ch < num_channels; ++ch) {
         std::vector<double> signal;
         std::vector<double> sig_smooth;
-        signal.reserve(filteredPoints.size());
+        signal.reserve(datapoints.size());
         sig_smooth.reserve(smoothedPoints.size());
 
-        for (const auto &p: filteredPoints) {
+        for (const auto &p: datapoints) {
             if (p.channelValues.size() > ch) signal.push_back(p.channelValues[ch]);
             else signal.push_back(0.0);
         }
