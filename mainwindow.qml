@@ -1383,12 +1383,21 @@ ApplicationWindow {
             Layout.fillHeight: true
             clip: true
 
-            ColumnLayout {
+            ScrollView {
+                id: rightPanelScroll
                 anchors.fill: parent
                 anchors.margins: 12
-                spacing: 10
+                ScrollBar.horizontal.policy: ScrollBar.AsNeeded
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+                clip: true
 
-                Label {
+                ColumnLayout {
+                    width: Math.max(rightPanelScroll.width - 24, implicitWidth)
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 10
+
+                    Label {
                     text: window.currentModule
                     font.bold: true
                     font.pixelSize: 18
@@ -1632,10 +1641,13 @@ ApplicationWindow {
 
                 Item {
                     Layout.fillHeight: true
+                    Layout.minimumHeight: 0
+                    opacity: window.currentModule !== "HRV GEO" ? 1 : 0
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
                     spacing: 10
 
                     Button {
@@ -1825,6 +1837,7 @@ ApplicationWindow {
                         }
                     }
                 }
+                }
             }
         }
     }
@@ -1840,7 +1853,6 @@ ApplicationWindow {
             Component.onCompleted: {
                 if (window.selectedFilterMethod === 0) rbMovingAverage.checked = true
                 else if (window.selectedFilterMethod === 1) rbButterworth.checked = true
-                else if (window.selectedFilterMethod === 2) rbSavitzky.checked = true
             }
 
             function isReady() {
@@ -1867,9 +1879,6 @@ ApplicationWindow {
                 } else if (rbButterworth.checked) {
                     window.selectedFilterMethod = 1
                     ekgController.runBaseline(1)
-                } else if (rbSavitzky.checked) {
-                    window.selectedFilterMethod = 2
-                    ekgController.runBaseline(2)
                 }
             }
 
@@ -1887,6 +1896,7 @@ ApplicationWindow {
                 id: rbMovingAverage
                 text: "Moving Average"
                 ButtonGroup.group: filterGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 0
             }
 
@@ -1894,14 +1904,8 @@ ApplicationWindow {
                 id: rbButterworth
                 text: "Butterworth"
                 ButtonGroup.group: filterGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedFilterMethod = 1
-            }
-
-            RadioButton {
-                id: rbSavitzky
-                text: "Savitzky-Golay"
-                ButtonGroup.group: filterGroup
-                onCheckedChanged: if (checked) window.selectedFilterMethod = 2
             }
         }
     }
@@ -1964,6 +1968,7 @@ ApplicationWindow {
                 id: rbPanTompkins
                 text: "Pan-Tompkins"
                 ButtonGroup.group: detectionMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 0
             }
 
@@ -1971,6 +1976,7 @@ ApplicationWindow {
                 id: rbHilbert
                 text: "Transformata Hilberta"
                 ButtonGroup.group: detectionMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 1
             }
 
@@ -1978,6 +1984,7 @@ ApplicationWindow {
                 id: rbWavelet
                 text: "Falkowa (Wavelet)"
                 ButtonGroup.group: detectionMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedRPeaksMethod = 2
             }
         }
@@ -2039,6 +2046,7 @@ ApplicationWindow {
                 id: rbClassicPeriodogram
                 text: "Klasyczny periodogram"
                 ButtonGroup.group: spectralMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedHRVTimeMethod = 0
             }
 
@@ -2046,6 +2054,7 @@ ApplicationWindow {
                 id: rbLombScargle
                 text: "Lomb-Scargle"
                 ButtonGroup.group: spectralMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedHRVTimeMethod = 1
             }
 
@@ -2053,6 +2062,7 @@ ApplicationWindow {
                 id: rbWelch
                 text: "Welch"
                 ButtonGroup.group: spectralMethodGroup
+                leftPadding: 16
                 onCheckedChanged: if (checked) window.selectedHRVTimeMethod = 2
             }
 
@@ -2193,13 +2203,13 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 height: 1
                 color: borderColor
-                visible: ekgController.hrvGeoCompleted
+                opacity: ekgController.hrvGeoCompleted ? 1 : 0
                 Layout.topMargin: 8
                 Layout.bottomMargin: 8
             }
 
             GridLayout {
-                visible: ekgController.hrvGeoCompleted
+                visible: window.currentModule === "HRV GEO"
                 columns: 2
                 columnSpacing: 12
                 rowSpacing: 6
@@ -2217,7 +2227,7 @@ ApplicationWindow {
                 }
                 Label {
                     text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().triangular_index.toFixed(2) : "-"
-                    color: Material.color(Material.Teal)
+                    color: ekgController.hrvGeoCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
@@ -2225,7 +2235,7 @@ ApplicationWindow {
                 }
                 Label {
                     text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().tinn.toFixed(2) + " ms" : "-"
-                    color: Material.color(Material.Teal)
+                    color: ekgController.hrvGeoCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
@@ -2241,7 +2251,7 @@ ApplicationWindow {
                 }
                 Label {
                     text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().sd1.toFixed(2) + " ms" : "-"
-                    color: Material.color(Material.Teal)
+                    color: ekgController.hrvGeoCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
@@ -2249,7 +2259,7 @@ ApplicationWindow {
                 }
                 Label {
                     text: ekgController.hrvGeoCompleted ? ekgController.getHRVGeoMetrics().sd2.toFixed(2) + " ms" : "-"
-                    color: Material.color(Material.Teal)
+                    color: ekgController.hrvGeoCompleted ? Material.color(Material.Teal) : textSecondary
                 }
             }
         }
@@ -2279,13 +2289,13 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 height: 1
                 color: borderColor
-                visible: ekgController.wavesCompleted
+                opacity: ekgController.wavesCompleted ? 1 : 0
                 Layout.topMargin: 8
                 Layout.bottomMargin: 8
             }
 
             GridLayout {
-                visible: ekgController.wavesCompleted
+                visible: window.currentModule === "WAVES"
                 columns: 2
                 columnSpacing: 12
                 rowSpacing: 6
@@ -2302,104 +2312,49 @@ ApplicationWindow {
                     text: "P onset:"
                 }
                 Label {
-                    text: chartWaveMarkers.p_onsets ? chartWaveMarkers.p_onsets.length : "0"
-                    color: Material.color(Material.Teal)
+                    text: ekgController.wavesCompleted && chartWaveMarkers.p_onsets ? chartWaveMarkers.p_onsets.length : "-"
+                    color: ekgController.wavesCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
                     text: "P end:"
                 }
                 Label {
-                    text: chartWaveMarkers.p_ends ? chartWaveMarkers.p_ends.length : "0"
-                    color: Material.color(Material.Teal)
+                    text: ekgController.wavesCompleted && chartWaveMarkers.p_ends ? chartWaveMarkers.p_ends.length : "-"
+                    color: ekgController.wavesCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
                     text: "QRS onset:"
                 }
                 Label {
-                    text: chartWaveMarkers.qrs_onsets ? chartWaveMarkers.qrs_onsets.length : "0"
-                    color: Material.color(Material.Teal)
+                    text: ekgController.wavesCompleted && chartWaveMarkers.qrs_onsets ? chartWaveMarkers.qrs_onsets.length : "-"
+                    color: ekgController.wavesCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
                     text: "QRS end:"
                 }
                 Label {
-                    text: chartWaveMarkers.qrs_ends ? chartWaveMarkers.qrs_ends.length : "0"
-                    color: Material.color(Material.Teal)
+                    text: ekgController.wavesCompleted && chartWaveMarkers.qrs_ends ? chartWaveMarkers.qrs_ends.length : "-"
+                    color: ekgController.wavesCompleted ? Material.color(Material.Teal) : textSecondary
                 }
 
                 Label {
                     text: "T end:"
                 }
                 Label {
-                    text: chartWaveMarkers.t_ends ? chartWaveMarkers.t_ends.length : "0"
-                    color: Material.color(Material.Teal)
+                    text: ekgController.wavesCompleted && chartWaveMarkers.t_ends ? chartWaveMarkers.t_ends.length : "-"
+                    color: ekgController.wavesCompleted ? Material.color(Material.Teal) : textSecondary
                 }
             }
 
-            ColumnLayout {
-                visible: ekgController.wavesCompleted
+            Item {
                 Layout.fillWidth: true
-                spacing: 4
                 Layout.topMargin: 8
-
-                Label {
-                    text: "Legenda:"
-                    font.bold: true
-                    font.pixelSize: 14
-                }
-
-                RowLayout {
-                    spacing: 8
-                    Rectangle {
-                        width: 12; height: 12; radius: 6; color: "#f59e0b"
-                    }
-                    Label {
-                        text: "P onset"; font.pixelSize: 12
-                    }
-                }
-
-                RowLayout {
-                    spacing: 8
-                    Rectangle {
-                        width: 12; height: 12; radius: 6; color: "#eab308"
-                    }
-                    Label {
-                        text: "P end"; font.pixelSize: 12
-                    }
-                }
-
-                RowLayout {
-                    spacing: 8
-                    Rectangle {
-                        width: 12; height: 12; radius: 6; color: "#8b5cf6"
-                    }
-                    Label {
-                        text: "QRS onset"; font.pixelSize: 12
-                    }
-                }
-
-                RowLayout {
-                    spacing: 8
-                    Rectangle {
-                        width: 12; height: 12; radius: 6; color: "#a78bfa"
-                    }
-                    Label {
-                        text: "QRS end"; font.pixelSize: 12
-                    }
-                }
-
-                RowLayout {
-                    spacing: 8
-                    Rectangle {
-                        width: 12; height: 12; radius: 6; color: "#ec4899"
-                    }
-                    Label {
-                        text: "T end"; font.pixelSize: 12
-                    }
-                }
+                Layout.preferredHeight: 0
+                Layout.minimumHeight: 0
+                Layout.maximumHeight: 0
             }
         }
     }
@@ -2514,12 +2469,6 @@ ApplicationWindow {
                 spacing: 4
                 Layout.topMargin: 8
 
-                Label {
-                    text: "Legenda:"
-                    font.bold: true
-                    font.pixelSize: 14
-                }
-
                 RowLayout {
                     spacing: 8
                     Rectangle {
@@ -2621,7 +2570,7 @@ ApplicationWindow {
             spacing: 8
 
             Label {
-                leftPadding: 8
+                leftPadding: 16
                 text: "Projekt Dedykowane Algorytmy Diagnostyki Medycznej - Analiza sygnału EKG 2026\n\n" +
                     "IB IEM AGH\n\n" +
                     "Autorzy:\n" +
