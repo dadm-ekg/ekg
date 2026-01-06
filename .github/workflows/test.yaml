@@ -6,6 +6,8 @@ jobs:
     steps:
       - id: Qt
         uses: jurplel/install-qt-action@v4
+        with:
+          modules: 'qtcharts'
       - uses: actions/checkout@v4
       - run: cmake .
       - run: cmake --build .
