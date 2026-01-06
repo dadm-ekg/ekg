@@ -5,7 +5,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<SignalDatapoint>& values) {
+std::vector<SignalDatapoint> ButterworthFilterService::Filter(const std::vector<SignalDatapoint>& values, int, int) {
     std::vector<SignalDatapoint> filtered(values.size()); // tworzenie nowego wektora filtered- nowy wynik
 
     if (values.size() < 3) // Jeśli sygnał ma mniej niż 3 próbki nie da się zastosować filtru 2 rzędu

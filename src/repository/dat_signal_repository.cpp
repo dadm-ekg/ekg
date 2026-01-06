@@ -14,6 +14,7 @@
 
 #include "../../include/model/signal_dataset.h"
 #include "../../include/model/signal_datapoint.h"
+#include "../../include/dto/validation_result.h"
 
 
 static bool parse_gain_baseline(const QString &line,
@@ -178,7 +179,36 @@ static void interpolate_invalid_inplace(std::vector<float> &v) {
 }
 
 
+static bool isValidNumber(const QString& str, bool allowFloat = false) {
+    if (str.isEmpty()) return false;
+    
+    bool hasDigits = false;
+    bool hasDot = false;
+    bool hasSign = false;
+    
+    for (int i = 0; i < str.length(); ++i) {
+        QChar c = str[i];
+        if (c.isDigit()) {
+            hasDigits = true;
+        } else if (c == '.' || c == ',') {
+            if (!allowFloat || hasDot) return false;
+            hasDot = true;
+        } else if (c == '-' || c == '+') {
+            if (hasSign || i > 0) return false;
+            hasSign = true;
+        } else if (c == 'e' || c == 'E') {
+            if (!allowFloat || i == 0 || i == str.length() - 1) return false;
+        } else {
+            return false;
+        }
+    }
+    
+    return hasDigits;
+}
+
 std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename) {
+    last_validation_result_ = ValidationResult();
+    
     QFileInfo fileInfo(filename);
     const QString baseName = fileInfo.completeBaseName();
     const QString dirPath = fileInfo.absolutePath();
@@ -188,32 +218,56 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
 
     QFile headerFile(headerPath);
     if (!headerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        std::cerr << "Error: Cannot open header file: "
-                << headerPath.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
+        last_validation_result_.addError("Błąd otwarcia pliku", 
+            QString("Nie można otworzyć pliku nagłówka: %1").arg(headerPath));
+        return nullptr;
     }
 
     QTextStream hs(&headerFile);
+    int lineNumber = 0;
 
     const QString firstLine = hs.readLine();
+    lineNumber++;
     const QStringList parts =
             firstLine.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
 
     if (parts.size() < 4) {
-        std::cerr << "Error: Invalid header format (first line): "
-                << firstLine.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
+        last_validation_result_.addError("Nieprawidłowy format nagłówka", 
+            QString("Pierwsza linia powinna zawierać co najmniej 4 elementy, znaleziono: %1").arg(parts.size()), 
+            lineNumber);
+        return nullptr;
     }
 
     bool okN = false, okF = false, okS = false;
+    
+    if (!isValidNumber(parts[1], false)) {
+        last_validation_result_.addError("Nieprawidłowa wartość liczbowa", 
+            QString("Liczba sygnałów zawiera nieprawidłowe znaki: '%1'").arg(parts[1]), 
+            lineNumber, 1);
+    }
+    if (!isValidNumber(parts[2], false)) {
+        last_validation_result_.addError("Nieprawidłowa wartość liczbowa", 
+            QString("Częstotliwość próbkowania zawiera nieprawidłowe znaki: '%1'").arg(parts[2]), 
+            lineNumber, 2);
+    }
+    if (!isValidNumber(parts[3], false)) {
+        last_validation_result_.addError("Nieprawidłowa wartość liczbowa", 
+            QString("Liczba próbek zawiera nieprawidłowe znaki: '%1'").arg(parts[3]), 
+            lineNumber, 3);
+    }
+    
     const int numSignals = parts[1].toInt(&okN);
     const int frequency = parts[2].toInt(&okF);
     const int numSamples = parts[3].toInt(&okS);
 
     if (!okN || !okF || !okS || numSignals <= 0 || frequency <= 0 || numSamples <= 0) {
-        std::cerr << "Error: Invalid numbers in header line: "
-                << firstLine.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
+        if (last_validation_result_.isValid) {
+            last_validation_result_.addError("Nieprawidłowe wartości liczbowe", 
+                QString("Nie można przekonwertować wartości na liczby całkowite lub wartości są nieprawidłowe (numSignals=%1, frequency=%2, numSamples=%3)")
+                    .arg(numSignals).arg(frequency).arg(numSamples), 
+                lineNumber);
+        }
+        return nullptr;
     }
 
     std::vector<double> gains(numSignals, 1.0);
@@ -222,21 +276,35 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
 
     for (int ch = 0; ch < numSignals; /* ++ch inside */) {
         if (hs.atEnd()) {
-            std::cerr << "Error: Unexpected end of header while reading channel lines."
-                    << std::endl;
-            return std::make_shared<SignalDataset>();
+            last_validation_result_.addError("Nieprawidłowy nagłówek", 
+                QString("Nieoczekiwany koniec pliku podczas odczytu linii kanału %1").arg(ch), 
+                lineNumber);
+            return nullptr;
         }
 
         const QString line = hs.readLine().trimmed();
+        lineNumber++;
         if (line.isEmpty() || line.startsWith('#')) continue;
 
         double g = 1.0;
         int b = 0;
         QString lead;
         if (!parse_gain_baseline(line, g, b, lead)) {
-            std::cerr << "Error: Cannot parse gain/baseline for channel "
-                    << ch << ": " << line.toStdString() << std::endl;
-            return std::make_shared<SignalDataset>();
+            last_validation_result_.addError("Nieprawidłowy format linii kanału", 
+                QString("Nie można sparsować wartości gain/baseline dla kanału %1: '%2'").arg(ch).arg(line), 
+                lineNumber);
+            return nullptr;
+        }
+        
+        if (!std::isfinite(g)) {
+            last_validation_result_.addError("Nieprawidłowa wartość (NaN/Inf)", 
+                QString("Wartość gain dla kanału %1 jest nieprawidłowa (NaN lub Inf)").arg(ch), 
+                lineNumber);
+        }
+        if (!std::isfinite(static_cast<double>(b))) {
+            last_validation_result_.addError("Nieprawidłowa wartość (NaN/Inf)", 
+                QString("Wartość baseline dla kanału %1 jest nieprawidłowa (NaN lub Inf)").arg(ch), 
+                lineNumber);
         }
 
         gains[ch] = (g == 0.0 ? 1.0 : g);
@@ -249,18 +317,18 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
 
     QFile dataFile(dataPath);
     if (!dataFile.open(QIODevice::ReadOnly)) {
-        std::cerr << "Error: Cannot open data file: "
-                << dataPath.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
+        last_validation_result_.addError("Błąd otwarcia pliku", 
+            QString("Nie można otworzyć pliku danych: %1").arg(dataPath));
+        return nullptr;
     }
 
     const QByteArray data = dataFile.readAll();
     dataFile.close();
 
     if (data.isEmpty()) {
-        std::cerr << "Error: Data file is empty: "
-                << dataPath.toStdString() << std::endl;
-        return std::make_shared<SignalDataset>();
+        last_validation_result_.addError("Pusty plik", 
+            QString("Plik danych jest pusty: %1").arg(dataPath));
+        return nullptr;
     }
 
     if (data.size() % static_cast<int>(sizeof(int16_t)) != 0) {
@@ -273,10 +341,10 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
     const qsizetype totalFrames = totalInt16 / numSignals;
 
     if (totalFrames <= 0) {
-        std::cerr << "Error: Not enough data for a single frame. "
-                << "totalInt16=" << totalInt16
-                << ", numSignals=" << numSignals << std::endl;
-        return std::make_shared<SignalDataset>();
+        last_validation_result_.addError("Niewystarczające dane", 
+            QString("Za mało danych dla pojedynczej ramki. totalInt16=%1, numSignals=%2")
+                .arg(totalInt16).arg(numSignals));
+        return nullptr;
     }
 
     if (totalFrames < numSamples) {
@@ -296,6 +364,8 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
                                           std::vector<float>(numSignals, 0.0f));
 
     int nonFiniteCount = 0;
+    int nanCount = 0;
+    int infCount = 0;
     const float NaN = std::numeric_limits<float>::quiet_NaN();
 
     for (int i = 0; i < framesAvailable; ++i) {
@@ -311,6 +381,11 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
 
             if (!std::isfinite(physical)) {
                 ++nonFiniteCount;
+                if (std::isnan(physical)) {
+                    ++nanCount;
+                } else if (std::isinf(physical)) {
+                    ++infCount;
+                }
                 physical = NaN;
             }
 
@@ -319,6 +394,20 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
     }
 
     if (nonFiniteCount > 0) {
+        QString errorMsg = QString("Wykryto %1 nieprawidłowych wartości").arg(nonFiniteCount);
+        if (nanCount > 0) {
+            errorMsg += QString(" (%1 NaN").arg(nanCount);
+            if (infCount > 0) {
+                errorMsg += QString(", %1 Inf").arg(infCount);
+            }
+            errorMsg += ")";
+        } else if (infCount > 0) {
+            errorMsg += QString(" (%1 Inf)").arg(infCount);
+        }
+        errorMsg += ". Wartości zostały interpolowane.";
+        
+        last_validation_result_.addError("Nieprawidłowe wartości (NaN/Inf)", errorMsg);
+        
         for (int ch = 0; ch < numSignals; ++ch) {
             std::vector<float> col(framesAvailable);
             for (int i = 0; i < framesAvailable; ++i)
@@ -329,10 +418,6 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
             for (int i = 0; i < framesAvailable; ++i)
                 temp[i][ch] = col[i];
         }
-
-        std::cerr << "Warning: detected " << nonFiniteCount
-                << " non-finite samples (NaN/Inf); interpolated in time."
-                << std::endl;
     }
 
     auto dataset = std::make_shared<SignalDataset>();
