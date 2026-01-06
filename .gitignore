@@ -1,5 +1,6 @@
 # This file is used to ignore files which are generated
 # ----------------------------------------------------------------------------
+.vscode/
 
 *~
 *.autosave
@@ -87,3 +88,7 @@ CMakeLists.txt.user*
 CMakeFiles/
 ekg_autogen/
 .qt/
+
+cmake-build-debug
+
+ekg_settings.json

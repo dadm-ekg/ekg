@@ -2,7 +2,8 @@
 #define EKG_FILTER_METHOD_H
 
 enum FilterMethod {
-    MovingAverage,
-    Butterworth
+    MovingAverage = 0,
+    Butterworth = 1,
+    SavitzkyGolay = 2
 };
 #endif //EKG_FILTER_METHOD_H
