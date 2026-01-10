@@ -176,12 +176,13 @@ bool ApplicationService::CalculateWaves() const {
 }
 
 HeartClassResult ApplicationService::CalculateHeartClass() const {
-    if (filtered_dataset == nullptr) {
+    if (filtered_dataset == nullptr || r_peaks == nullptr) {
         return HeartClassResult{};
     }
     
     heart_class_result_ = heart_class_detection_service_->Detect(
         filtered_dataset->values,
+        *r_peaks,
         filtered_dataset->frequency
     );
     
