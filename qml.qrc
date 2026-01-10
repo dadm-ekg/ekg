@@ -1,5 +1,19 @@
 <RCC>
     <qresource prefix="/">
         <file>mainwindow.qml</file>
+
+        <!-- BeatCNN5 weights -->
+        <file>models/beatcnn5/csv/conv1_w.csv</file>
+        <file>models/beatcnn5/csv/conv1_b.csv</file>
+        <file>models/beatcnn5/csv/conv2_w.csv</file>
+        <file>models/beatcnn5/csv/conv2_b.csv</file>
+        <file>models/beatcnn5/csv/conv3_w.csv</file>
+        <file>models/beatcnn5/csv/conv3_b.csv</file>
+        <file>models/beatcnn5/csv/conv4_w.csv</file>
+        <file>models/beatcnn5/csv/conv4_b.csv</file>
+        <file>models/beatcnn5/csv/conv5_w.csv</file>
+        <file>models/beatcnn5/csv/conv5_b.csv</file>
+        <file>models/beatcnn5/csv/fc_w.csv</file>
+        <file>models/beatcnn5/csv/fc_b.csv</file>
     </qresource>
 </RCC>
