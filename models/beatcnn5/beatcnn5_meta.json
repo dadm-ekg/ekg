@@ -1,0 +1,126 @@
+{
+  "format": "beatcnn5_weights_v1",
+  "dtype": "float32",
+  "endianness": "little",
+  "total_floats": 8628,
+  "total_bytes": 34512,
+  "order": [
+    "conv1_w",
+    "conv1_b",
+    "conv2_w",
+    "conv2_b",
+    "conv3_w",
+    "conv3_b",
+    "conv4_w",
+    "conv4_b",
+    "conv5_w",
+    "conv5_b",
+    "fc_w",
+    "fc_b"
+  ],
+  "tensors": {
+    "conv1_w": {
+      "offset_floats": 0,
+      "count_floats": 56,
+      "shape": [
+        8,
+        1,
+        7
+      ]
+    },
+    "conv1_b": {
+      "offset_floats": 56,
+      "count_floats": 8,
+      "shape": [
+        8
+      ]
+    },
+    "conv2_w": {
+      "offset_floats": 64,
+      "count_floats": 640,
+      "shape": [
+        16,
+        8,
+        5
+      ]
+    },
+    "conv2_b": {
+      "offset_floats": 704,
+      "count_floats": 16,
+      "shape": [
+        16
+      ]
+    },
+    "conv3_w": {
+      "offset_floats": 720,
+      "count_floats": 1536,
+      "shape": [
+        32,
+        16,
+        3
+      ]
+    },
+    "conv3_b": {
+      "offset_floats": 2256,
+      "count_floats": 32,
+      "shape": [
+        32
+      ]
+    },
+    "conv4_w": {
+      "offset_floats": 2288,
+      "count_floats": 3072,
+      "shape": [
+        32,
+        32,
+        3
+      ]
+    },
+    "conv4_b": {
+      "offset_floats": 5360,
+      "count_floats": 32,
+      "shape": [
+        32
+      ]
+    },
+    "conv5_w": {
+      "offset_floats": 5392,
+      "count_floats": 3072,
+      "shape": [
+        32,
+        32,
+        3
+      ]
+    },
+    "conv5_b": {
+      "offset_floats": 8464,
+      "count_floats": 32,
+      "shape": [
+        32
+      ]
+    },
+    "fc_w": {
+      "offset_floats": 8496,
+      "count_floats": 128,
+      "shape": [
+        4,
+        32
+      ]
+    },
+    "fc_b": {
+      "offset_floats": 8624,
+      "count_floats": 4,
+      "shape": [
+        4
+      ]
+    }
+  },
+  "class_names": [
+    "N",
+    "S",
+    "V",
+    "other"
+  ],
+  "window_len": 61,
+  "sha256": "64f2c2aca6e6c173b5de961d715fb6ee51f922ee2e295aebcd5342f5d72d0860"
+}
