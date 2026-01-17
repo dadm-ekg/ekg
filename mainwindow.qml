@@ -73,26 +73,51 @@ ApplicationWindow {
     }
 
     function refreshVisualization() {
+        console.log("refreshVisualization called, hasData:", ekgController.hasData)
+        
         if (!ekgController.hasData) {
             chartRawSeries = []
             chartFilteredSeries = []
             chartRPeaksSeries = []
+            chartTotalDuration = 0
             chartLoading = false
-            Qt.callLater(applySeriesToChart)
+            applySeriesToChart()
             return
         }
 
-        if (!chartLoading) {
-            chartLoading = true
+        chartLoading = true
+        
+        var channel = clampChannelIndex(selectedChannelIndex)
+        
+        var duration = ekgController.signalDuration()
+        if (duration > 0) {
+            chartTotalDuration = duration
         }
-        Qt.callLater(function () {
-            var channel = clampChannelIndex(selectedChannelIndex)
-            chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints)
-            chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints)
-            chartRPeaksSeries = ekgController.getRPeakMarkers(channel)
-            chartWaveMarkers = ekgController.getWaveMarkers(channel)
-            Qt.callLater(applySeriesToChart)
-        })
+        
+        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+        var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
+        var startTime = chartScrollPosition * scrollableRange
+        var endTime = startTime + effectiveWindowSize
+        
+        if (chartTotalDuration > 0) {
+            startTime = Math.max(0, startTime - 0.5)
+            endTime = Math.min(chartTotalDuration, endTime + 0.5)
+        }
+        
+        console.log("Loading data: start=" + startTime.toFixed(1) + "s end=" + endTime.toFixed(1) + "s scrollPos=" + chartScrollPosition.toFixed(3))
+        
+        chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints, startTime, endTime)
+        chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints, startTime, endTime)
+        chartRPeaksSeries = ekgController.getRPeakMarkers(channel, startTime, endTime)
+        chartWaveMarkers = ekgController.getWaveMarkers(channel)
+        
+        if (chartRawSeries.length > 0) {
+            console.log("Data loaded: " + chartRawSeries.length + " pts, x range: " + chartRawSeries[0].x.toFixed(1) + " - " + chartRawSeries[chartRawSeries.length-1].x.toFixed(1))
+        } else {
+            console.log("No raw data loaded!")
+        }
+        
+        applySeriesToChart()
     }
 
     function scheduleVisualizationRefresh() {
@@ -157,7 +182,6 @@ ApplicationWindow {
 
         var minY = Number.MAX_VALUE
         var maxY = -Number.MAX_VALUE
-        var maxX = 0
 
         function scan(series) {
             for (var i = 0; i < series.length; ++i) {
@@ -165,7 +189,6 @@ ApplicationWindow {
                 if (!p) continue
                 if (p.y < minY) minY = p.y
                 if (p.y > maxY) maxY = p.y
-                if (p.x > maxX) maxX = p.x
             }
         }
 
@@ -181,12 +204,12 @@ ApplicationWindow {
             maxY += 0.5
         }
 
-        chartTotalDuration = maxX > 0 ? maxX : 1
-
-        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration > 0 ? chartTotalDuration : 1)
         var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
         var startX = chartScrollPosition * scrollableRange
         var endX = startX + effectiveWindowSize
+
+        console.log("rescaleChart: startX=", startX, "endX=", endX, "minY=", minY, "maxY=", maxY, "scrollPos=", chartScrollPosition)
 
         chartAxisX.min = startX
         chartAxisX.max = endX
@@ -196,10 +219,11 @@ ApplicationWindow {
 
     function scrollChart(delta) {
         if (chartTotalDuration <= chartWindowSize) return
-        var scrollableRange = chartTotalDuration - chartWindowSize
-        var step = (chartWindowSize * 0.1) / scrollableRange
+        var step = 0.05
         chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition + delta * step))
+        console.log("scrollChart: delta=" + delta + " scrollPos=" + chartScrollPosition.toFixed(3))
         updateChartView()
+        scrollDebounce.restart()
     }
 
     function zoomChart(factor) {
@@ -209,6 +233,7 @@ ApplicationWindow {
         chartWindowSize = newWindowSize
         chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition))
         updateChartView()
+        scrollDebounce.restart()
     }
 
     function updateChartView() {
@@ -648,6 +673,16 @@ ApplicationWindow {
         repeat: false
         onTriggered: refreshVisualization()
     }
+    
+    Timer {
+        id: scrollDebounce
+        interval: 300
+        repeat: false
+        onTriggered: {
+            console.log("Scroll stopped, refreshing visualization")
+            refreshVisualization()
+        }
+    }
 
     header: ToolBar {
         leftPadding: 8
@@ -918,10 +953,72 @@ ApplicationWindow {
                         return filtered
                     }
 
+                    section.property: "modelData"
+                    section.criteria: ViewSection.FirstCharacter
+                    section.delegate: Item {
+                        width: ListView.view.width
+                        height: 28
+                        
+                        Rectangle {
+                            anchors.fill: parent
+                            color: isDarkTheme ? "#1a2332" : "#e5e7eb"
+                            
+                            Label {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: {
+                                    var sec = section
+                                    if (sec === "L") return "📁 LUDB"
+                                    if (sec === "M") return "📁 MIT-BIH"
+                                    return sec
+                                }
+                                font.bold: true
+                                font.pixelSize: 12
+                                color: isDarkTheme ? "#60a5fa" : "#2563eb"
+                            }
+                        }
+                    }
+
                     delegate: ItemDelegate {
                         width: ListView.view.width
-                        text: modelData
-                        highlighted: ekgController.loadedFilename === modelData
+                        
+                        contentItem: Row {
+                            spacing: 8
+                            
+                            Rectangle {
+                                width: 48
+                                height: 18
+                                radius: 3
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: modelData.startsWith("LUDB/") ? (isDarkTheme ? "#1e3a5f" : "#dbeafe") : (isDarkTheme ? "#3f1e3f" : "#fce7f3")
+                                
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: modelData.startsWith("LUDB/") ? "LUDB" : "MITBIH"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: modelData.startsWith("LUDB/") ? (isDarkTheme ? "#60a5fa" : "#2563eb") : (isDarkTheme ? "#f472b6" : "#db2777")
+                                }
+                            }
+                            
+                            Label {
+                                text: {
+                                    if (modelData.startsWith("LUDB/")) return modelData.substring(5)
+                                    if (modelData.startsWith("MITBIH/")) return modelData.substring(7)
+                                    return modelData
+                                }
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: isDarkTheme ? "#f9fafb" : "#111827"
+                            }
+                        }
+                        
+                        highlighted: {
+                            var loadedName = ekgController.loadedFilename
+                            if (modelData.startsWith("LUDB/")) return loadedName === modelData.substring(5)
+                            if (modelData.startsWith("MITBIH/")) return loadedName === modelData.substring(7)
+                            return loadedName === modelData
+                        }
 
                         onClicked: {
                             pendingFileName = modelData
@@ -1035,6 +1132,57 @@ ApplicationWindow {
                                 enabled: ekgController.hasData && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
                                 visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
                                 onClicked: zoomChart(0.67)
+                            }
+                        }
+                        
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            spacing: 10
+                            visible: ekgController.hasData && chartTotalDuration > chartWindowSize && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                            
+                            Label {
+                                text: {
+                                    var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+                                    var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
+                                    var startTime = chartScrollPosition * scrollableRange
+                                    var minutes = Math.floor(startTime / 60)
+                                    var seconds = Math.floor(startTime % 60)
+                                    return minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
+                                }
+                                font.family: "monospace"
+                                color: textSecondary
+                            }
+                            
+                            Slider {
+                                id: navigationSlider
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 1
+                                value: chartScrollPosition
+                                enabled: chartTotalDuration > chartWindowSize
+                                
+                                onMoved: {
+                                    chartScrollPosition = value
+                                    updateChartView()
+                                }
+                                
+                                onPressedChanged: {
+                                    if (!pressed) {
+                                        console.log("Slider released, refreshing visualization, scrollPosition:", chartScrollPosition)
+                                        refreshVisualization()
+                                    }
+                                }
+                            }
+                            
+                            Label {
+                                text: {
+                                    var minutes = Math.floor(chartTotalDuration / 60)
+                                    var seconds = Math.floor(chartTotalDuration % 60)
+                                    return minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
+                                }
+                                font.family: "monospace"
+                                color: textSecondary
                             }
                         }
 
@@ -1278,6 +1426,13 @@ ApplicationWindow {
                                     dragStartX = mouse.x
                                     dragStartScrollPos = chartScrollPosition
                                     chartTooltip.hide()
+                                }
+                                
+                                onReleased: function (mouse) {
+                                    if (Math.abs(chartScrollPosition - dragStartScrollPos) > 0.001) {
+                                        console.log("Chart drag released, refreshing visualization")
+                                        refreshVisualization()
+                                    }
                                 }
 
                                 onPositionChanged: function (mouse) {

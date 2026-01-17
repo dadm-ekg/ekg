@@ -20,16 +20,45 @@
 static bool parse_gain_baseline(const QString &line,
                                 double &gain,
                                 int &baseline,
-                                QString &leadNameOut) {
+                                QString &leadNameOut,
+                                int &formatOut) {
     const QStringList tokens =
             line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
 
     if (tokens.isEmpty()) return false;
 
-    // Default outputs
     gain = 1.0;
     baseline = 0;
+    formatOut = 16;
     leadNameOut = tokens.last();
+
+    if (tokens.size() >= 5) {
+        bool okFmt = false;
+        int fmt = tokens[1].toInt(&okFmt);
+        
+        bool isPlainGain = false;
+        double plainGainValue = 0.0;
+        if (tokens.size() > 2 && !tokens[2].contains('(') && !tokens[2].contains('/')) {
+            bool okG = false;
+            plainGainValue = tokens[2].toDouble(&okG);
+            isPlainGain = okG;
+        }
+        
+        if (okFmt && isPlainGain && (fmt == 212 || fmt == 16 || fmt == 80 || fmt == 310 || fmt == 311)) {
+            formatOut = fmt;
+            gain = (plainGainValue == 0.0 ? 1.0 : plainGainValue);
+            
+            if (tokens.size() >= 5) {
+                bool okBaseline = false;
+                int b = tokens[4].toInt(&okBaseline);
+                if (okBaseline) {
+                    baseline = b;
+                }
+            }
+            
+            return true;
+        }
+    }
 
     for (const QString &t: tokens) {
         int l = t.indexOf('(');
@@ -206,6 +235,39 @@ static bool isValidNumber(const QString& str, bool allowFloat = false) {
     return hasDigits;
 }
 
+static std::vector<std::vector<int16_t>> decodeFormat212(const QByteArray &data, int numSignals, int numSamples) {
+    std::vector<std::vector<int16_t>> samples;
+    
+    if (numSignals != 2) {
+        return samples;
+    }
+    
+    const uint8_t* raw = reinterpret_cast<const uint8_t*>(data.constData());
+    const qsizetype dataSize = data.size();
+    qsizetype byteIdx = 0;
+    
+    samples.reserve(numSamples);
+    
+    while (byteIdx + 2 < dataSize && static_cast<int>(samples.size()) < numSamples) {
+        uint8_t b0 = raw[byteIdx];
+        uint8_t b1 = raw[byteIdx + 1];
+        uint8_t b2 = raw[byteIdx + 2];
+        
+        int16_t s0 = (b0 & 0xFF) | ((b1 & 0x0F) << 8);
+        if (s0 & 0x800) s0 |= 0xF000;
+        
+        int16_t s1 = ((b1 & 0xF0) >> 4) | ((b2 & 0xFF) << 4);
+        if (s1 & 0x800) s1 |= 0xF000;
+        
+        std::vector<int16_t> frame = {s0, s1};
+        samples.push_back(frame);
+        
+        byteIdx += 3;
+    }
+    
+    return samples;
+}
+
 std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename) {
     last_validation_result_ = ValidationResult();
     
@@ -273,6 +335,7 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
     std::vector<double> gains(numSignals, 1.0);
     std::vector<int> baselines(numSignals, 0);
     std::vector<QString> leadNames(numSignals, "");
+    std::vector<int> formats(numSignals, 16);
 
     for (int ch = 0; ch < numSignals; /* ++ch inside */) {
         if (hs.atEnd()) {
@@ -289,7 +352,8 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
         double g = 1.0;
         int b = 0;
         QString lead;
-        if (!parse_gain_baseline(line, g, b, lead)) {
+        int fmt = 16;
+        if (!parse_gain_baseline(line, g, b, lead, fmt)) {
             last_validation_result_.addError("Nieprawidłowy format linii kanału", 
                 QString("Nie można sparsować wartości gain/baseline dla kanału %1: '%2'").arg(ch).arg(line), 
                 lineNumber);
@@ -310,10 +374,13 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
         gains[ch] = (g == 0.0 ? 1.0 : g);
         baselines[ch] = b;
         leadNames[ch] = lead;
+        formats[ch] = fmt;
         ++ch;
     }
 
     headerFile.close();
+    
+    int dataFormat = formats.empty() ? 16 : formats[0];
 
     QFile dataFile(dataPath);
     if (!dataFile.open(QIODevice::ReadOnly)) {
@@ -331,65 +398,100 @@ std::shared_ptr<SignalDataset> DATSignalRepository::Load(const QString &filename
         return nullptr;
     }
 
-    if (data.size() % static_cast<int>(sizeof(int16_t)) != 0) {
-        std::cerr << "Warning: Data size not multiple of 2 bytes. "
-                << "Size=" << data.size() << " bytes." << std::endl;
-    }
-
-    const qsizetype totalInt16 =
-            data.size() / static_cast<qsizetype>(sizeof(int16_t));
-    const qsizetype totalFrames = totalInt16 / numSignals;
-
-    if (totalFrames <= 0) {
-        last_validation_result_.addError("Niewystarczające dane", 
-            QString("Za mało danych dla pojedynczej ramki. totalInt16=%1, numSignals=%2")
-                .arg(totalInt16).arg(numSignals));
-        return nullptr;
-    }
-
-    if (totalFrames < numSamples) {
-        std::cerr << "Warning: Data shorter than header. "
-                << "HeaderSamples=" << numSamples
-                << ", AvailableFrames=" << totalFrames
-                << ". Will interpolate to header length."
-                << std::endl;
-    }
-
-    const int framesAvailable =
-            static_cast<int>(std::min<qsizetype>(totalFrames, numSamples));
-    const int16_t *raw =
-            reinterpret_cast<const int16_t *>(data.constData());
-
-    std::vector<std::vector<float> > temp(framesAvailable,
-                                          std::vector<float>(numSignals, 0.0f));
-
+    std::vector<std::vector<float>> temp;
+    int framesAvailable = 0;
     int nonFiniteCount = 0;
     int nanCount = 0;
     int infCount = 0;
     const float NaN = std::numeric_limits<float>::quiet_NaN();
-
-    for (int i = 0; i < framesAvailable; ++i) {
-        const qsizetype base = static_cast<qsizetype>(i) * numSignals;
-        for (int ch = 0; ch < numSignals; ++ch) {
-            const qsizetype idx = base + ch;
-            if (idx >= totalInt16) break;
-
-            const int16_t adc = raw[idx];
-            float physical = static_cast<float>(
-                (static_cast<double>(adc) - baselines[ch]) / gains[ch]
-            );
-
-            if (!std::isfinite(physical)) {
-                ++nonFiniteCount;
-                if (std::isnan(physical)) {
-                    ++nanCount;
-                } else if (std::isinf(physical)) {
-                    ++infCount;
+    
+    if (dataFormat == 212 && numSignals == 2) {
+        auto decoded = decodeFormat212(data, numSignals, numSamples);
+        framesAvailable = static_cast<int>(decoded.size());
+        
+        if (framesAvailable <= 0) {
+            last_validation_result_.addError("Niewystarczające dane", 
+                QString("Za mało danych dla formatu 212"));
+            return nullptr;
+        }
+        
+        temp.resize(framesAvailable, std::vector<float>(numSignals, 0.0f));
+        
+        for (int i = 0; i < framesAvailable; ++i) {
+            for (int ch = 0; ch < numSignals; ++ch) {
+                const int16_t adc = decoded[i][ch];
+                float physical = static_cast<float>(
+                    (static_cast<double>(adc) - baselines[ch]) / gains[ch]
+                );
+                
+                if (!std::isfinite(physical)) {
+                    ++nonFiniteCount;
+                    if (std::isnan(physical)) {
+                        ++nanCount;
+                    } else if (std::isinf(physical)) {
+                        ++infCount;
+                    }
+                    physical = NaN;
                 }
-                physical = NaN;
+                
+                temp[i][ch] = physical;
             }
+        }
+    } else {
+        if (data.size() % static_cast<int>(sizeof(int16_t)) != 0) {
+            std::cerr << "Warning: Data size not multiple of 2 bytes. "
+                    << "Size=" << data.size() << " bytes." << std::endl;
+        }
 
-            temp[i][ch] = physical;
+        const qsizetype totalInt16 =
+                data.size() / static_cast<qsizetype>(sizeof(int16_t));
+        const qsizetype totalFrames = totalInt16 / numSignals;
+
+        if (totalFrames <= 0) {
+            last_validation_result_.addError("Niewystarczające dane", 
+                QString("Za mało danych dla pojedynczej ramki. totalInt16=%1, numSignals=%2")
+                    .arg(totalInt16).arg(numSignals));
+            return nullptr;
+        }
+
+        if (totalFrames < numSamples) {
+            std::cerr << "Warning: Data shorter than header. "
+                    << "HeaderSamples=" << numSamples
+                    << ", AvailableFrames=" << totalFrames
+                    << ". Will interpolate to header length."
+                    << std::endl;
+        }
+
+        framesAvailable =
+                static_cast<int>(std::min<qsizetype>(totalFrames, numSamples));
+        const int16_t *raw =
+                reinterpret_cast<const int16_t *>(data.constData());
+
+        temp.resize(framesAvailable, std::vector<float>(numSignals, 0.0f));
+
+        for (int i = 0; i < framesAvailable; ++i) {
+            const qsizetype base = static_cast<qsizetype>(i) * numSignals;
+            for (int ch = 0; ch < numSignals; ++ch) {
+                const qsizetype idx = base + ch;
+                if (idx >= totalInt16) break;
+
+                const int16_t adc = raw[idx];
+                float physical = static_cast<float>(
+                    (static_cast<double>(adc) - baselines[ch]) / gains[ch]
+                );
+
+                if (!std::isfinite(physical)) {
+                    ++nonFiniteCount;
+                    if (std::isnan(physical)) {
+                        ++nanCount;
+                    } else if (std::isinf(physical)) {
+                        ++infCount;
+                    }
+                    physical = NaN;
+                }
+
+                temp[i][ch] = physical;
+            }
         }
     }
 
