@@ -3212,9 +3212,6 @@ ApplicationWindow {
             opacity = 0
         }
 
-        onRejected: {
-        }
-
         contentItem: ColumnLayout {
             anchors.fill: parent
             anchors.margins: 16
