@@ -1622,8 +1622,9 @@ ApplicationWindow {
                 }
 
                 Label {
-                    visible: !ekgController.hasFilteredData && window.currentModule === "HEART CLASS"
-                    text: "⚠️ Najpierw uruchom filtrowanie baseline"
+                    // visible: !ekgController.hasFilteredData && window.currentModule === "HEART CLASS"
+                    visible: !ekgController.rPeaksCompleted && window.currentModule === "HEART CLASS"
+                    text: "⚠️ Najpierw uruchom detekcję pików R"
                     color: Material.color(Material.Orange)
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
