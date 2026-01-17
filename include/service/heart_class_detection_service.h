@@ -5,7 +5,10 @@
 
 class HeartClassDetectionService : public IHeartClassDetectionService {
 public:
-    HeartClassResult Detect(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
+    HeartClassResult Detect(
+        const std::vector<SignalDatapoint>& datapoints, 
+        const std::vector<RPeaksAnnotatedSignalDatapoint>& r_peaks,
+        int frequency) override;
 };
 
 #endif //EKG_HEART_CLASS_DETECTION_SERVICE_IMPL_H
