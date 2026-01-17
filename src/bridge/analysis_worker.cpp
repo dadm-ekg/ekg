@@ -1,7 +1,62 @@
 #include "../../include/bridge/analysis_worker.h"
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 
 AnalysisWorker::AnalysisWorker(std::shared_ptr<IApplicationService> application_service, QObject *parent)
     : QObject(parent), application_service_(std::move(application_service)) {
+}
+
+void AnalysisWorker::loadFile(const QString &filename) {
+    if (filename.isEmpty()) {
+        emit fileLoadCompleted(false, "", "Nie wybrano pliku");
+        return;
+    }
+
+    bool success = application_service_->Load(filename);
+    QString errorMessage;
+
+    if (success) {
+        emit fileLoadCompleted(true, filename, "");
+    } else {
+        QString lastError = application_service_->GetLastValidationError();
+        if (lastError.isEmpty()) {
+            errorMessage = "Nie udało się załadować pliku";
+        } else {
+            errorMessage = lastError;
+        }
+        emit fileLoadCompleted(false, filename, errorMessage);
+    }
+}
+
+void AnalysisWorker::loadFileByName(const QString &filename) {
+    if (filename.isEmpty()) {
+        emit fileLoadCompleted(false, "", "Nie wybrano pliku");
+        return;
+    }
+
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir dir(appDir);
+
+    while (!dir.exists("ludb") && dir.cdUp()) {
+    }
+
+    QString fullPath;
+    
+    if (filename.startsWith("LUDB/")) {
+        QString baseName = filename.mid(5);
+        QString ludbPath = dir.absoluteFilePath("ludb");
+        fullPath = ludbPath + "/" + baseName + ".dat";
+    } else if (filename.startsWith("MITBIH/")) {
+        QString baseName = filename.mid(7);
+        QString mitbihPath = dir.absoluteFilePath("mitbih");
+        fullPath = mitbihPath + "/" + baseName + ".dat";
+    } else {
+        QString ludbPath = dir.absoluteFilePath("ludb");
+        fullPath = ludbPath + "/" + filename + ".dat";
+    }
+
+    loadFile(fullPath);
 }
 
 void AnalysisWorker::runBaseline(FilterMethod filterMethod, int windowSize, int polynomialOrder) {
