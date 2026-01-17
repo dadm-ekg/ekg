@@ -508,7 +508,10 @@ QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int chan
     }
     
     const int rangeSize = endIdx - startIdx;
-    const int stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(rangeSize) / std::max(1, maxPoints))));
+    int stride = 1;
+    if (maxPoints > 0) {
+        stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(rangeSize) / maxPoints)));
+    }
 
     series.reserve(rangeSize / stride + 1);
 

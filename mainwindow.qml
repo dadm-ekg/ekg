@@ -73,8 +73,6 @@ ApplicationWindow {
     }
 
     function refreshVisualization() {
-        console.log("refreshVisualization called, hasData:", ekgController.hasData)
-        
         if (!ekgController.hasData) {
             chartRawSeries = []
             chartFilteredSeries = []
@@ -94,27 +92,26 @@ ApplicationWindow {
             chartTotalDuration = duration
         }
         
-        var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
-        var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
-        var startTime = chartScrollPosition * scrollableRange
-        var endTime = startTime + effectiveWindowSize
-        
-        if (chartTotalDuration > 0) {
-            startTime = Math.max(0, startTime - 0.5)
-            endTime = Math.min(chartTotalDuration, endTime + 0.5)
-        }
-        
-        console.log("Loading data: start=" + startTime.toFixed(1) + "s end=" + endTime.toFixed(1) + "s scrollPos=" + chartScrollPosition.toFixed(3))
-        
-        chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints, startTime, endTime)
-        chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints, startTime, endTime)
-        chartRPeaksSeries = ekgController.getRPeakMarkers(channel, startTime, endTime)
-        chartWaveMarkers = ekgController.getWaveMarkers(channel)
-        
-        if (chartRawSeries.length > 0) {
-            console.log("Data loaded: " + chartRawSeries.length + " pts, x range: " + chartRawSeries[0].x.toFixed(1) + " - " + chartRawSeries[chartRawSeries.length-1].x.toFixed(1))
+        if (chartTotalDuration < 15) {
+            chartRawSeries = ekgController.getRawSeries(channel, -1, -1, -1)
+            chartFilteredSeries = ekgController.getFilteredSeries(channel, -1, -1, -1)
+            chartRPeaksSeries = ekgController.getRPeakMarkers(channel, -1, -1)
+            chartWaveMarkers = ekgController.getWaveMarkers(channel)
         } else {
-            console.log("No raw data loaded!")
+            var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
+            var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
+            var startTime = chartScrollPosition * scrollableRange
+            var endTime = startTime + effectiveWindowSize
+            
+            if (chartTotalDuration > 0) {
+                startTime = Math.max(0, startTime - 0.5)
+                endTime = Math.min(chartTotalDuration, endTime + 0.5)
+            }
+            
+            chartRawSeries = ekgController.getRawSeries(channel, maxPlottedPoints, startTime, endTime)
+            chartFilteredSeries = ekgController.getFilteredSeries(channel, maxPlottedPoints, startTime, endTime)
+            chartRPeaksSeries = ekgController.getRPeakMarkers(channel, startTime, endTime)
+            chartWaveMarkers = ekgController.getWaveMarkers(channel)
         }
         
         applySeriesToChart()
@@ -209,8 +206,6 @@ ApplicationWindow {
         var startX = chartScrollPosition * scrollableRange
         var endX = startX + effectiveWindowSize
 
-        console.log("rescaleChart: startX=", startX, "endX=", endX, "minY=", minY, "maxY=", maxY, "scrollPos=", chartScrollPosition)
-
         chartAxisX.min = startX
         chartAxisX.max = endX
         chartAxisY.min = minY
@@ -221,9 +216,10 @@ ApplicationWindow {
         if (chartTotalDuration <= chartWindowSize) return
         var step = 0.05
         chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition + delta * step))
-        console.log("scrollChart: delta=" + delta + " scrollPos=" + chartScrollPosition.toFixed(3))
         updateChartView()
-        scrollDebounce.restart()
+        if (chartTotalDuration >= 15) {
+            scrollDebounce.restart()
+        }
     }
 
     function zoomChart(factor) {
@@ -233,7 +229,9 @@ ApplicationWindow {
         chartWindowSize = newWindowSize
         chartScrollPosition = Math.max(0, Math.min(1, chartScrollPosition))
         updateChartView()
-        scrollDebounce.restart()
+        if (chartTotalDuration >= 15) {
+            scrollDebounce.restart()
+        }
     }
 
     function updateChartView() {
@@ -678,10 +676,7 @@ ApplicationWindow {
         id: scrollDebounce
         interval: 300
         repeat: false
-        onTriggered: {
-            console.log("Scroll stopped, refreshing visualization")
-            refreshVisualization()
-        }
+        onTriggered: refreshVisualization()
     }
 
     header: ToolBar {
@@ -1168,8 +1163,7 @@ ApplicationWindow {
                                 }
                                 
                                 onPressedChanged: {
-                                    if (!pressed) {
-                                        console.log("Slider released, refreshing visualization, scrollPosition:", chartScrollPosition)
+                                    if (!pressed && chartTotalDuration >= 15) {
                                         refreshVisualization()
                                     }
                                 }
@@ -1429,8 +1423,7 @@ ApplicationWindow {
                                 }
                                 
                                 onReleased: function (mouse) {
-                                    if (Math.abs(chartScrollPosition - dragStartScrollPos) > 0.001) {
-                                        console.log("Chart drag released, refreshing visualization")
+                                    if (Math.abs(chartScrollPosition - dragStartScrollPos) > 0.001 && chartTotalDuration >= 15) {
                                         refreshVisualization()
                                     }
                                 }
