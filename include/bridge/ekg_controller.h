@@ -27,6 +27,7 @@ class EkgController : public QObject {
     Q_PROPERTY(bool hrvGeoCompleted READ hrvGeoCompleted NOTIFY hrvGeoCompletedChanged)
     Q_PROPERTY(bool wavesCompleted READ wavesCompleted NOTIFY wavesCompletedChanged)
     Q_PROPERTY(bool heartClassCompleted READ heartClassCompleted NOTIFY heartClassCompletedChanged)
+    Q_PROPERTY(bool isFileLoading READ isFileLoading NOTIFY isFileLoadingChanged)
 
 public:
     Q_ENUM(FilterMethod)
@@ -85,6 +86,7 @@ public:
     bool hrvGeoCompleted() const;
     bool wavesCompleted() const;
     bool heartClassCompleted() const;
+    bool isFileLoading() const;
 
 signals:
     void loadedFilenameChanged();
@@ -97,6 +99,7 @@ signals:
     void hrvGeoCompletedChanged();
     void wavesCompletedChanged();
     void heartClassCompletedChanged();
+    void isFileLoadingChanged();
     void fileLoadSuccess(const QString &filename);
     void fileLoadError(const QString &errorMessage);
     void filteringSuccess(const QString &filterName);
@@ -127,6 +130,7 @@ private:
     bool hrv_geo_completed_ = false;
     bool waves_completed_ = false;
     bool heart_class_completed_ = false;
+    bool is_file_loading_ = false;
     HRVTimeMetrics cached_hrv_metrics_;
     HRVGeoMetrics cached_hrv_geo_metrics_;
     HeartClassResult cached_heart_class_result_;

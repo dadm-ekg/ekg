@@ -31,6 +31,32 @@ void EkgController::setupAnalysisWorker() {
     analysis_worker_->moveToThread(analysis_thread_);
     
     connect(analysis_thread_, &QThread::finished, analysis_worker_, &QObject::deleteLater);
+    connect(analysis_worker_, &AnalysisWorker::fileLoadCompleted, this, [this](bool success, QString filename, QString errorMessage) {
+        is_file_loading_ = false;
+        emit isFileLoadingChanged();
+        
+        if (success) {
+            baseline_completed_ = false;
+            r_peaks_completed_ = false;
+            hrv_time_completed_ = false;
+            hrv_geo_completed_ = false;
+            waves_completed_ = false;
+            heart_class_completed_ = false;
+            emit loadedFilenameChanged();
+            emit isFileLoadedChanged();
+            emit hasDataChanged();
+            emit baselineCompletedChanged();
+            emit rPeaksCompletedChanged();
+            emit hrvTimeCompletedChanged();
+            emit hrvGeoCompletedChanged();
+            emit wavesCompletedChanged();
+            emit heartClassCompletedChanged();
+            emit fileLoadSuccess(filename);
+        } else {
+            emit fileLoadError(errorMessage);
+        }
+    });
+    
     connect(analysis_worker_, &AnalysisWorker::baselineCompleted, this, [this](bool success, QString filterName, QString errorMessage) {
         if (success) {
             baseline_completed_ = true;
@@ -122,32 +148,15 @@ void EkgController::loadData(const QString &filename) {
         return;
     }
 
-    bool success = application_service_->Load(filename);
-
-    if (success) {
-        baseline_completed_ = false;
-        r_peaks_completed_ = false;
-        hrv_time_completed_ = false;
-        hrv_geo_completed_ = false;
-        waves_completed_ = false;
-        heart_class_completed_ = false;
-        emit loadedFilenameChanged();
-        emit isFileLoadedChanged();
-        emit hasDataChanged();
-        emit baselineCompletedChanged();
-        emit rPeaksCompletedChanged();
-        emit hrvTimeCompletedChanged();
-        emit hrvGeoCompletedChanged();
-        emit wavesCompletedChanged();
-        emit heartClassCompletedChanged();
-        emit fileLoadSuccess(filename);
-    } else {
-        QString errorMessage = application_service_->GetLastValidationError();
-        if (errorMessage.isEmpty()) {
-            errorMessage = "Nie udało się załadować pliku";
-        }
-        emit fileLoadError(errorMessage);
+    if (is_file_loading_) {
+        emit fileLoadError("Trwa ładowanie pliku. Proszę czekać.");
+        return;
     }
+
+    is_file_loading_ = true;
+    emit isFileLoadingChanged();
+    
+    QMetaObject::invokeMethod(analysis_worker_, "loadFile", Qt::QueuedConnection, Q_ARG(QString, filename));
 }
 
 void EkgController::openFileDialog() {
@@ -309,6 +318,10 @@ bool EkgController::heartClassCompleted() const {
     return heart_class_completed_;
 }
 
+bool EkgController::isFileLoading() const {
+    return is_file_loading_;
+}
+
 void EkgController::resetHRVTime() {
     hrv_time_completed_ = false;
     cached_hrv_metrics_ = HRVTimeMetrics{};
@@ -431,28 +444,20 @@ QStringList EkgController::getAvailableFiles() const {
 }
 
 void EkgController::loadFileByName(const QString &filename) {
-    QString appDir = QCoreApplication::applicationDirPath();
-    QDir dir(appDir);
-
-    while (!dir.exists("ludb") && dir.cdUp()) {
+    if (filename.isEmpty()) {
+        emit fileLoadError("Nie wybrano pliku");
+        return;
     }
 
-    QString fullPath;
+    if (is_file_loading_) {
+        emit fileLoadError("Trwa ładowanie pliku. Proszę czekać.");
+        return;
+    }
+
+    is_file_loading_ = true;
+    emit isFileLoadingChanged();
     
-    if (filename.startsWith("LUDB/")) {
-        QString baseName = filename.mid(5);
-        QString ludbPath = dir.absoluteFilePath("ludb");
-        fullPath = ludbPath + "/" + baseName + ".dat";
-    } else if (filename.startsWith("MITBIH/")) {
-        QString baseName = filename.mid(7);
-        QString mitbihPath = dir.absoluteFilePath("mitbih");
-        fullPath = mitbihPath + "/" + baseName + ".dat";
-    } else {
-        QString ludbPath = dir.absoluteFilePath("ludb");
-        fullPath = ludbPath + "/" + filename + ".dat";
-    }
-
-    loadData(fullPath);
+    QMetaObject::invokeMethod(analysis_worker_, "loadFileByName", Qt::QueuedConnection, Q_ARG(QString, filename));
 }
 
 void EkgController::resetBaseline() {

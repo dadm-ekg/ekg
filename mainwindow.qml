@@ -3180,19 +3180,36 @@ ApplicationWindow {
         modal: true
         standardButtons: Dialog.Yes | Dialog.No
         implicitWidth: 400
-
-        onVisibleChanged: if (visible) {
-            x = (window.width - implicitWidth) / 2
-            y = (window.height - implicitHeight) / 2
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        
+        property string fileNameToLoad: ""
+        
+        enter: Transition {
+            NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 0 }
+        }
+        
+        exit: Transition {
+            NumberAnimation { property: "opacity"; from: 1.0; to: 0.0; duration: 0 }
+        }
+        
+        onVisibleChanged: {
+            if (visible) {
+                x = (window.width - implicitWidth) / 2
+                y = (window.height - implicitHeight) / 2
+            } else {
+                if (fileNameToLoad !== "") {
+                    loadingDialog.fileNameToLoad = fileNameToLoad
+                    fileNameToLoad = ""
+                    loadingDialog.open()
+                }
+                pendingFileName = ""
+            }
         }
 
         onAccepted: {
-            ekgController.loadFileByName(pendingFileName)
-            pendingFileName = ""
-        }
-
-        onRejected: {
-            pendingFileName = ""
+            fileNameToLoad = pendingFileName
+            visible = false
+            opacity = 0
         }
 
         contentItem: ColumnLayout {
@@ -3204,6 +3221,76 @@ ApplicationWindow {
                 text: "Czy na pewno chcesz załadować plik " + pendingFileName + "?"
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
+            }
+        }
+    }
+
+    Dialog {
+        id: loadingDialog
+        title: "Ładowanie pliku"
+        modal: true
+        standardButtons: Dialog.NoButton
+        implicitWidth: 300
+        closePolicy: Popup.NoAutoClose
+        
+        property string fileNameToLoad: ""
+        
+        Timer {
+            id: loadDelayTimer
+            interval: 100
+            onTriggered: {
+                if (loadingDialog.fileNameToLoad !== "") {
+                    ekgController.loadFileByName(loadingDialog.fileNameToLoad)
+                    loadingDialog.fileNameToLoad = ""
+                }
+            }
+        }
+
+        onVisibleChanged: {
+            if (visible) {
+                x = (window.width - implicitWidth) / 2
+                y = (window.height - implicitHeight) / 2
+                if (fileNameToLoad !== "") {
+                    if (fileNameToLoad.startsWith("LUDB/")) {
+                        loadDelayTimer.start()
+                    } else {
+                        ekgController.loadFileByName(fileNameToLoad)
+                        fileNameToLoad = ""
+                    }
+                }
+            }
+        }
+
+        Connections {
+            target: ekgController
+            function onIsFileLoadingChanged() {
+                if (!ekgController.isFileLoading) {
+                    loadingDialog.close()
+                }
+            }
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 16
+
+            Item {
+                Layout.preferredHeight: 20
+            }
+
+            BusyIndicator {
+                Layout.alignment: Qt.AlignHCenter
+                running: loadingDialog.visible
+                Layout.preferredHeight: 50
+                Layout.preferredWidth: 50
+            }
+
+            Label {
+                text: "Trwa ładowanie pliku..."
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
             }
         }
     }

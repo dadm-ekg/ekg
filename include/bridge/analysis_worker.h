@@ -18,6 +18,8 @@ public:
     explicit AnalysisWorker(std::shared_ptr<IApplicationService> application_service, QObject *parent = nullptr);
 
 public slots:
+    void loadFile(const QString &filename);
+    void loadFileByName(const QString &filename);
     void runBaseline(FilterMethod filterMethod, int windowSize, int polynomialOrder);
     void runRPeaksDetection(RPeaksDetectionMethod method);
     void runHRVTime(HRVSpectralMethod method);
@@ -26,6 +28,7 @@ public slots:
     void runHeartClass();
 
 signals:
+    void fileLoadCompleted(bool success, QString filename, QString errorMessage);
     void baselineCompleted(bool success, QString filterName, QString errorMessage);
     void rPeaksDetectionCompleted(bool success, QString methodName, QString errorMessage);
     void hrvTimeCompleted(bool success, QString methodName, HRVTimeMetrics metrics, QString errorMessage);
