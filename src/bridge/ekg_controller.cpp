@@ -157,12 +157,12 @@ void EkgController::openFileDialog() {
     while (!dir.exists("ludb") && dir.cdUp()) {
     }
 
-    QString ludbPath = dir.absoluteFilePath("ludb");
+    QString defaultPath = dir.absolutePath();
 
     QString filename = QFileDialog::getOpenFileName(
         nullptr,
         "Wybierz plik danych EKG",
-        ludbPath,
+        defaultPath,
         "DAT Files (*.dat);;All Files (*)"
     );
 
@@ -399,24 +399,32 @@ QStringList EkgController::getAvailableFiles() const {
     while (!dir.exists("ludb") && dir.cdUp()) {
     }
 
-    QString ludbPath = dir.absoluteFilePath("ludb");
-    QDir ludbDir(ludbPath);
-
-    if (!ludbDir.exists()) {
-        return QStringList();
-    }
-
+    QStringList fileBasenames;
     QStringList filters;
     filters << "*.dat";
-    ludbDir.setNameFilters(filters);
-    ludbDir.setSorting(QDir::Name);
 
-    QStringList files = ludbDir.entryList(QDir::Files);
-    
-    QStringList fileBasenames;
-    for (const QString &file : files) {
-        QFileInfo fileInfo(file);
-        fileBasenames.append(fileInfo.completeBaseName());
+    QString ludbPath = dir.absoluteFilePath("ludb");
+    QDir ludbDir(ludbPath);
+    if (ludbDir.exists()) {
+        ludbDir.setNameFilters(filters);
+        ludbDir.setSorting(QDir::Name);
+        QStringList ludbFiles = ludbDir.entryList(QDir::Files);
+        for (const QString &file : ludbFiles) {
+            QFileInfo fileInfo(file);
+            fileBasenames.append("LUDB/" + fileInfo.completeBaseName());
+        }
+    }
+
+    QString mitbihPath = dir.absoluteFilePath("mitbih");
+    QDir mitbihDir(mitbihPath);
+    if (mitbihDir.exists()) {
+        mitbihDir.setNameFilters(filters);
+        mitbihDir.setSorting(QDir::Name);
+        QStringList mitbihFiles = mitbihDir.entryList(QDir::Files);
+        for (const QString &file : mitbihFiles) {
+            QFileInfo fileInfo(file);
+            fileBasenames.append("MITBIH/" + fileInfo.completeBaseName());
+        }
     }
 
     return fileBasenames;
@@ -429,8 +437,20 @@ void EkgController::loadFileByName(const QString &filename) {
     while (!dir.exists("ludb") && dir.cdUp()) {
     }
 
-    QString ludbPath = dir.absoluteFilePath("ludb");
-    QString fullPath = ludbPath + "/" + filename + ".dat";
+    QString fullPath;
+    
+    if (filename.startsWith("LUDB/")) {
+        QString baseName = filename.mid(5);
+        QString ludbPath = dir.absoluteFilePath("ludb");
+        fullPath = ludbPath + "/" + baseName + ".dat";
+    } else if (filename.startsWith("MITBIH/")) {
+        QString baseName = filename.mid(7);
+        QString mitbihPath = dir.absoluteFilePath("mitbih");
+        fullPath = mitbihPath + "/" + baseName + ".dat";
+    } else {
+        QString ludbPath = dir.absoluteFilePath("ludb");
+        fullPath = ludbPath + "/" + filename + ".dat";
+    }
 
     loadData(fullPath);
 }
@@ -467,7 +487,7 @@ void EkgController::resetRPeaks() {
 }
 
 namespace {
-QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int channel, int maxPoints) {
+QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int channel, int maxPoints, double startTime, double endTime) {
     QVariantList series;
     if (!dataset || dataset->values.empty()) return series;
 
@@ -477,12 +497,25 @@ QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int chan
     const int clampedChannel = std::max(0, std::min(channel, channelCount - 1));
     const double frequency = dataset->frequency > 0 ? static_cast<double>(dataset->frequency) : 1.0;
 
-    const int sampleCount = static_cast<int>(dataset->values.size());
-    const int stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(sampleCount) / std::max(1, maxPoints))));
+    const int totalSampleCount = static_cast<int>(dataset->values.size());
+    
+    int startIdx = 0;
+    int endIdx = totalSampleCount;
+    
+    if (startTime >= 0 && endTime > startTime) {
+        startIdx = std::max(0, static_cast<int>(startTime * frequency));
+        endIdx = std::min(totalSampleCount, static_cast<int>(endTime * frequency) + 1);
+    }
+    
+    const int rangeSize = endIdx - startIdx;
+    int stride = 1;
+    if (maxPoints > 0) {
+        stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(rangeSize) / maxPoints)));
+    }
 
-    series.reserve(sampleCount / stride + 1);
+    series.reserve(rangeSize / stride + 1);
 
-    for (int i = 0; i < sampleCount; i += stride) {
+    for (int i = startIdx; i < endIdx; i += stride) {
         const auto &point = dataset->values[static_cast<size_t>(i)];
         if (static_cast<size_t>(clampedChannel) >= point.channelValues.size()) continue;
         const double t = static_cast<double>(i) / frequency;
@@ -496,15 +529,15 @@ QVariantList buildSeries(const std::shared_ptr<SignalDataset> &dataset, int chan
 }
 }
 
-QVariantList EkgController::getRawSeries(int channel, int maxPoints) const {
-    return buildSeries(application_service_->GetData(), channel, maxPoints);
+QVariantList EkgController::getRawSeries(int channel, int maxPoints, double startTime, double endTime) const {
+    return buildSeries(application_service_->GetData(), channel, maxPoints, startTime, endTime);
 }
 
-QVariantList EkgController::getFilteredSeries(int channel, int maxPoints) const {
-    return buildSeries(application_service_->GetFilteredData(), channel, maxPoints);
+QVariantList EkgController::getFilteredSeries(int channel, int maxPoints, double startTime, double endTime) const {
+    return buildSeries(application_service_->GetFilteredData(), channel, maxPoints, startTime, endTime);
 }
 
-QVariantList EkgController::getRPeakMarkers(int channel) const {
+QVariantList EkgController::getRPeakMarkers(int channel, double startTime, double endTime) const {
     QVariantList markers;
 
     const auto peaks = application_service_->GetRPeaks();
@@ -519,9 +552,16 @@ QVariantList EkgController::getRPeakMarkers(int channel) const {
     const int clampedChannel = std::max(0, std::min(channel, channelCount - 1));
     const double frequency = filtered->frequency > 0 ? static_cast<double>(filtered->frequency) : 1.0;
 
-    markers.reserve(peaks->size());
+    const int totalSamples = static_cast<int>(peaks->size());
+    int startIdx = 0;
+    int endIdx = totalSamples;
+    
+    if (startTime >= 0 && endTime > startTime) {
+        startIdx = std::max(0, static_cast<int>(startTime * frequency));
+        endIdx = std::min(totalSamples, static_cast<int>(endTime * frequency) + 1);
+    }
 
-    for (size_t i = 0; i < peaks->size(); ++i) {
+    for (int i = startIdx; i < endIdx; ++i) {
         const auto &peak = (*peaks)[i];
         if (static_cast<size_t>(clampedChannel) >= peak.peaks.size() || !peak.peaks[static_cast<size_t>(clampedChannel)]) {
             continue;
@@ -703,6 +743,20 @@ double EkgController::samplingFrequency() const {
 
     auto filtered = application_service_->GetFilteredData();
     if (filtered && filtered->frequency > 0) return static_cast<double>(filtered->frequency);
+
+    return 0.0;
+}
+
+double EkgController::signalDuration() const {
+    auto data = application_service_->GetData();
+    if (data && !data->values.empty() && data->frequency > 0) {
+        return static_cast<double>(data->values.size()) / static_cast<double>(data->frequency);
+    }
+
+    auto filtered = application_service_->GetFilteredData();
+    if (filtered && !filtered->values.empty() && filtered->frequency > 0) {
+        return static_cast<double>(filtered->values.size()) / static_cast<double>(filtered->frequency);
+    }
 
     return 0.0;
 }

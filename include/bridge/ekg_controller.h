@@ -51,9 +51,9 @@ public:
     Q_INVOKABLE void resetHRVGeo();
     Q_INVOKABLE void resetWaves();
     Q_INVOKABLE void resetHeartClass();
-    Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000) const;
-    Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000) const;
-    Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0) const;
+    Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000, double startTime = -1, double endTime = -1) const;
+    Q_INVOKABLE QVariantList getFilteredSeries(int channel = 0, int maxPoints = 4000, double startTime = -1, double endTime = -1) const;
+    Q_INVOKABLE QVariantList getRPeakMarkers(int channel = 0, double startTime = -1, double endTime = -1) const;
     Q_INVOKABLE QVariantMap getHRVTimeMetrics() const;
     Q_INVOKABLE QVariantList getHRVTimePowerSpectrum() const;
     Q_INVOKABLE QVariantList getHRVTimeTachogram() const;
@@ -65,6 +65,7 @@ public:
     Q_INVOKABLE QVariantList getHeartClassAnnotations() const;
     Q_INVOKABLE int channelCount() const;
     Q_INVOKABLE double samplingFrequency() const;
+    Q_INVOKABLE double signalDuration() const;
     Q_INVOKABLE bool exportFilteredSignal(int format, const QString &filepath);
     Q_INVOKABLE bool exportRPeaks(int format, const QString &filepath);
     Q_INVOKABLE bool exportHRVTime(int format, const QString &filepath);
