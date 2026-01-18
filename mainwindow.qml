@@ -1999,7 +1999,7 @@ ApplicationWindow {
                             } else if (window.currentModule === "WAVES") {
                                 return ekgController.hasFilteredData
                             } else if (window.currentModule === "HEART CLASS") {
-                                return ekgController.hasFilteredData
+                                return ekgController.hasFilteredData && ekgController.rPeaksCompleted
                             }
                             return true
                         }
@@ -2025,6 +2025,8 @@ ApplicationWindow {
                                 return "Najpierw uruchom filtrowanie baseline"
                             } else if (window.currentModule === "HEART CLASS" && !ekgController.hasFilteredData) {
                                 return "Najpierw uruchom filtrowanie baseline"
+                            } else if (window.currentModule === "HEART CLASS" && !ekgController.rPeaksCompleted) {
+                                return "Najpierw uruchom detekcję pików R"
                             }
                             return ""
                         }

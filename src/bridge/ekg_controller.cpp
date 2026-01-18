@@ -350,6 +350,10 @@ bool EkgController::runHeartClass() {
         emit heartClassError("Brak przefiltrowanych danych. Najpierw uruchom filtrowanie baseline.");
         return false;
     }
+    if (!rPeaksCompleted()) {
+        emit heartClassError("Brak wykrytych pików R. Najpierw uruchom detekcję pików R.");
+        return false;
+    }
 
     QMetaObject::invokeMethod(analysis_worker_, "runHeartClass", Qt::QueuedConnection);
     return true;
