@@ -2,9 +2,9 @@
 #define EKG_HRV_DFA_METRICS_H
 
 class HRVDFAMetrics {
-// TODO(Hubert): trzeba zweryfikować
 public:
-    float alpha1, alpha2;
+    float alpha1 = 0.0f;
+    float alpha2 = 0.0f;
 };
 
-#endif //EKG_HRV_DFA_METRICS_H
+#endif

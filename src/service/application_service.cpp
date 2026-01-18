@@ -16,6 +16,7 @@ ApplicationService::ApplicationService(
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
+    std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service,
     std::shared_ptr<IWavesDetectionService> waves_detection_service,
     std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service
 )
@@ -26,6 +27,7 @@ ApplicationService::ApplicationService(
       r_peaks_detection_service_(std::move(r_peaks_detection_service)),
       hrv_time_processing_service_(std::move(hrv_time_processing_service)),
       hrv_geo_processing_service_(std::move(hrv_geo_processing_service)),
+      hrv_dfa_processing_service_(std::move(hrv_dfa_processing_service)),
       waves_detection_service_(std::move(waves_detection_service)),
       heart_class_detection_service_(std::move(heart_class_detection_service)) {
 }
@@ -157,6 +159,16 @@ HRVGeoMetrics ApplicationService::CalculateHRVGeo() const {
         return HRVGeoMetrics{};
     }
     return hrv_geo_processing_service_->Process(
+        *r_peaks,
+        filtered_dataset->frequency
+    );
+}
+
+HRVDFAMetrics ApplicationService::CalculateHRVDFA() const {
+    if (filtered_dataset == nullptr || r_peaks == nullptr) {
+        return HRVDFAMetrics{};
+    }
+    return hrv_dfa_processing_service_->Process(
         *r_peaks,
         filtered_dataset->frequency
     );

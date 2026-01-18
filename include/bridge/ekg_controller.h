@@ -25,6 +25,7 @@ class EkgController : public QObject {
     Q_PROPERTY(bool rPeaksCompleted READ rPeaksCompleted NOTIFY rPeaksCompletedChanged)
     Q_PROPERTY(bool hrvTimeCompleted READ hrvTimeCompleted NOTIFY hrvTimeCompletedChanged)
     Q_PROPERTY(bool hrvGeoCompleted READ hrvGeoCompleted NOTIFY hrvGeoCompletedChanged)
+    Q_PROPERTY(bool hrvDfaCompleted READ hrvDfaCompleted NOTIFY hrvDfaCompletedChanged)
     Q_PROPERTY(bool wavesCompleted READ wavesCompleted NOTIFY wavesCompletedChanged)
     Q_PROPERTY(bool heartClassCompleted READ heartClassCompleted NOTIFY heartClassCompletedChanged)
     Q_PROPERTY(bool isFileLoading READ isFileLoading NOTIFY isFileLoadingChanged)
@@ -42,6 +43,7 @@ public:
     Q_INVOKABLE bool runRPeaksDetection(int method);
     Q_INVOKABLE bool runHRVTime(int method);
     Q_INVOKABLE bool runHRVGeo();
+    Q_INVOKABLE bool runHRVDFA();
     Q_INVOKABLE bool runWaves();
     Q_INVOKABLE bool runHeartClass();
     Q_INVOKABLE QStringList getAvailableFiles() const;
@@ -50,6 +52,7 @@ public:
     Q_INVOKABLE void resetRPeaks();
     Q_INVOKABLE void resetHRVTime();
     Q_INVOKABLE void resetHRVGeo();
+    Q_INVOKABLE void resetHRVDFA();
     Q_INVOKABLE void resetWaves();
     Q_INVOKABLE void resetHeartClass();
     Q_INVOKABLE QVariantList getRawSeries(int channel = 0, int maxPoints = 4000, double startTime = -1, double endTime = -1) const;
@@ -61,6 +64,7 @@ public:
     Q_INVOKABLE QVariantMap getHRVGeoMetrics() const;
     Q_INVOKABLE QVariantList getHRVGeoHistogram() const;
     Q_INVOKABLE QVariantList getHRVGeoPoincare() const;
+    Q_INVOKABLE QVariantMap getHRVDFAMetrics() const;
     Q_INVOKABLE QVariantMap getHeartClassBarChart() const;
     Q_INVOKABLE QVariantMap getWaveMarkers(int channel = 0) const;
     Q_INVOKABLE QVariantList getHeartClassAnnotations() const;
@@ -71,6 +75,7 @@ public:
     Q_INVOKABLE bool exportRPeaks(int format, const QString &filepath);
     Q_INVOKABLE bool exportHRVTime(int format, const QString &filepath);
     Q_INVOKABLE bool exportHRVGeo(int format, const QString &filepath);
+    Q_INVOKABLE bool exportHRVDFA(int format, const QString &filepath);
     Q_INVOKABLE bool exportWaves(int format, const QString &filepath);
     Q_INVOKABLE bool exportHeartClass(int format, const QString &filepath);
     Q_INVOKABLE void openSaveSettingsDialog(int selectedFilterMethod, int selectedRPeaksMethod, int selectedHRVTimeMethod, int selectedChannelIndex, const QString &currentModule, bool isDarkTheme, double chartWindowSize, int maxPlottedPoints, int windowSize, int polynomialOrder);
@@ -84,6 +89,7 @@ public:
     bool rPeaksCompleted() const;
     bool hrvTimeCompleted() const;
     bool hrvGeoCompleted() const;
+    bool hrvDfaCompleted() const;
     bool wavesCompleted() const;
     bool heartClassCompleted() const;
     bool isFileLoading() const;
@@ -97,6 +103,7 @@ signals:
     void rPeaksCompletedChanged();
     void hrvTimeCompletedChanged();
     void hrvGeoCompletedChanged();
+    void hrvDfaCompletedChanged();
     void wavesCompletedChanged();
     void heartClassCompletedChanged();
     void isFileLoadingChanged();
@@ -110,6 +117,8 @@ signals:
     void hrvTimeError(const QString &errorMessage);
     void hrvGeoSuccess();
     void hrvGeoError(const QString &errorMessage);
+    void hrvDfaSuccess();
+    void hrvDfaError(const QString &errorMessage);
     void wavesSuccess();
     void wavesError(const QString &errorMessage);
     void heartClassSuccess();
@@ -128,11 +137,13 @@ private:
     bool r_peaks_completed_ = false;
     bool hrv_time_completed_ = false;
     bool hrv_geo_completed_ = false;
+    bool hrv_dfa_completed_ = false;
     bool waves_completed_ = false;
     bool heart_class_completed_ = false;
     bool is_file_loading_ = false;
     HRVTimeMetrics cached_hrv_metrics_;
     HRVGeoMetrics cached_hrv_geo_metrics_;
+    HRVDFAMetrics cached_hrv_dfa_metrics_;
     HeartClassResult cached_heart_class_result_;
     
     void setupAnalysisWorker();

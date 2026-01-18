@@ -3,14 +3,14 @@
 #include <vector>
 
 #include "../../dto/hrv_dfa_metrics.h"
-#include "../../model/signal_datapoint.h"
+#include "../../model/r_peaks_annotated_signal_datapoint.h"
 
 class IHRVDFAProcessingService {
 public:
     virtual ~IHRVDFAProcessingService() = default;
 
-    virtual HRVDFAMetrics Process(const std::vector<SignalDatapoint>& datapoints, int frequency) = 0;
+    virtual HRVDFAMetrics Process(const std::vector<RPeaksAnnotatedSignalDatapoint>& datapoints, int frequency) = 0;
 };
 
-#endif //EKG_HRV_DFA_PROCESSING_SERVICE_H
+#endif
 

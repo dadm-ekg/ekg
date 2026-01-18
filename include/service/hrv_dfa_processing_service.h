@@ -5,7 +5,7 @@
 
 class HRVDFAProcessingService : public IHRVDFAProcessingService {
 public:
-    HRVDFAMetrics Process(const std::vector<SignalDatapoint>& datapoints, int frequency) override;
+    HRVDFAMetrics Process(const std::vector<RPeaksAnnotatedSignalDatapoint>& datapoints, int frequency) override;
 };
 
-#endif //EKG_HRV_DFA_PROCESSING_SERVICE_IMPL_H
+#endif

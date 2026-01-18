@@ -40,6 +40,7 @@ void EkgController::setupAnalysisWorker() {
             r_peaks_completed_ = false;
             hrv_time_completed_ = false;
             hrv_geo_completed_ = false;
+            hrv_dfa_completed_ = false;
             waves_completed_ = false;
             heart_class_completed_ = false;
             emit loadedFilenameChanged();
@@ -49,6 +50,7 @@ void EkgController::setupAnalysisWorker() {
             emit rPeaksCompletedChanged();
             emit hrvTimeCompletedChanged();
             emit hrvGeoCompletedChanged();
+            emit hrvDfaCompletedChanged();
             emit wavesCompletedChanged();
             emit heartClassCompletedChanged();
             emit fileLoadSuccess(filename);
@@ -63,6 +65,7 @@ void EkgController::setupAnalysisWorker() {
             r_peaks_completed_ = false;
             hrv_time_completed_ = false;
             hrv_geo_completed_ = false;
+            hrv_dfa_completed_ = false;
             waves_completed_ = false;
             heart_class_completed_ = false;
             emit hasFilteredDataChanged();
@@ -70,6 +73,7 @@ void EkgController::setupAnalysisWorker() {
             emit rPeaksCompletedChanged();
             emit hrvTimeCompletedChanged();
             emit hrvGeoCompletedChanged();
+            emit hrvDfaCompletedChanged();
             emit wavesCompletedChanged();
             emit heartClassCompletedChanged();
             emit filteringSuccess(filterName);
@@ -83,11 +87,13 @@ void EkgController::setupAnalysisWorker() {
             r_peaks_completed_ = true;
             hrv_time_completed_ = false;
             hrv_geo_completed_ = false;
+            hrv_dfa_completed_ = false;
             waves_completed_ = false;
             heart_class_completed_ = false;
             emit rPeaksCompletedChanged();
             emit hrvTimeCompletedChanged();
             emit hrvGeoCompletedChanged();
+            emit hrvDfaCompletedChanged();
             emit wavesCompletedChanged();
             emit heartClassCompletedChanged();
             emit rPeaksDetectionSuccess(methodName);
@@ -115,6 +121,17 @@ void EkgController::setupAnalysisWorker() {
             emit hrvGeoSuccess();
         } else {
             emit hrvGeoError(errorMessage);
+        }
+    });
+
+    connect(analysis_worker_, &AnalysisWorker::hrvDfaCompleted, this, [this](bool success, HRVDFAMetrics metrics, QString errorMessage) {
+        if (success) {
+            cached_hrv_dfa_metrics_ = metrics;
+            hrv_dfa_completed_ = true;
+            emit hrvDfaCompletedChanged();
+            emit hrvDfaSuccess();
+        } else {
+            emit hrvDfaError(errorMessage);
         }
     });
     
@@ -268,6 +285,16 @@ bool EkgController::runHRVGeo() {
     return true;
 }
 
+bool EkgController::runHRVDFA() {
+    if (!rPeaksCompleted()) {
+        emit hrvDfaError("Brak wykrytych pików R. Najpierw uruchom detekcję pików R.");
+        return false;
+    }
+
+    QMetaObject::invokeMethod(analysis_worker_, "runHRVDFA", Qt::QueuedConnection);
+    return true;
+}
+
 bool EkgController::runWaves() {
     if (!hasFilteredData()) {
         emit wavesError("Brak przefiltrowanych danych. Najpierw uruchom filtrowanie baseline.");
@@ -310,6 +337,10 @@ bool EkgController::hrvGeoCompleted() const {
     return hrv_geo_completed_;
 }
 
+bool EkgController::hrvDfaCompleted() const {
+    return hrv_dfa_completed_;
+}
+
 bool EkgController::wavesCompleted() const {
     return waves_completed_;
 }
@@ -332,6 +363,12 @@ void EkgController::resetHRVGeo() {
     hrv_geo_completed_ = false;
     cached_hrv_geo_metrics_ = HRVGeoMetrics{};
     emit hrvGeoCompletedChanged();
+}
+
+void EkgController::resetHRVDFA() {
+    hrv_dfa_completed_ = false;
+    cached_hrv_dfa_metrics_ = HRVDFAMetrics{};
+    emit hrvDfaCompletedChanged();
 }
 
 void EkgController::resetWaves() {
@@ -470,6 +507,7 @@ void EkgController::resetBaseline() {
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
+    hrv_dfa_completed_ = false;
     waves_completed_ = false;
     heart_class_completed_ = false;
     emit hasFilteredDataChanged();
@@ -477,6 +515,7 @@ void EkgController::resetBaseline() {
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
+    emit hrvDfaCompletedChanged();
     emit wavesCompletedChanged();
     emit heartClassCompletedChanged();
 }
@@ -486,11 +525,13 @@ void EkgController::resetRPeaks() {
     r_peaks_completed_ = false;
     hrv_time_completed_ = false;
     hrv_geo_completed_ = false;
+    hrv_dfa_completed_ = false;
     waves_completed_ = false;
     heart_class_completed_ = false;
     emit rPeaksCompletedChanged();
     emit hrvTimeCompletedChanged();
     emit hrvGeoCompletedChanged();
+    emit hrvDfaCompletedChanged();
     emit wavesCompletedChanged();
     emit heartClassCompletedChanged();
 }
@@ -636,6 +677,13 @@ QVariantMap EkgController::getHRVGeoMetrics() const {
     metrics["tinn"] = cached_hrv_geo_metrics_.tinn;
     metrics["sd1"] = cached_hrv_geo_metrics_.sd1;
     metrics["sd2"] = cached_hrv_geo_metrics_.sd2;
+    return metrics;
+}
+
+QVariantMap EkgController::getHRVDFAMetrics() const {
+    QVariantMap metrics;
+    metrics["alpha1"] = static_cast<double>(cached_hrv_dfa_metrics_.alpha1);
+    metrics["alpha2"] = static_cast<double>(cached_hrv_dfa_metrics_.alpha2);
     return metrics;
 }
 
@@ -808,6 +856,16 @@ bool EkgController::exportHRVGeo(int format, const QString &filepath) {
         filepath,
         loadedFilename(),
         cached_hrv_geo_metrics_
+    );
+}
+
+bool EkgController::exportHRVDFA(int format, const QString &filepath) {
+    FileFormat fileFormat = static_cast<FileFormat>(format);
+    return results_repository_->ExportHRVDFA(
+        fileFormat,
+        filepath,
+        loadedFilename(),
+        cached_hrv_dfa_metrics_
     );
 }
 
