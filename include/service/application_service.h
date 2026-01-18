@@ -7,11 +7,13 @@
 #include "abstract/r_peaks_detection_service.h"
 #include "abstract/hrv_time_processing_service.h"
 #include "abstract/hrv_geo_processing_service.h"
+#include "abstract/hrv_dfa_processing_service.h"
 #include "abstract/waves_detection_service.h"
 #include "abstract/heart_class_detection_service.h"
 #include "../dto/filter_method.h"
 #include "../dto/hrv_time_metrics.h"
 #include "../dto/hrv_geo_metrics.h"
+#include "../dto/hrv_dfa_metrics.h"
 #include "../dto/heart_class_result.h"
 
 class ApplicationService : public IApplicationService {
@@ -22,6 +24,7 @@ class ApplicationService : public IApplicationService {
     std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service_;
     std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service_;
     std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service_;
+    std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service_;
     std::shared_ptr<IWavesDetectionService> waves_detection_service_;
     std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service_;
 
@@ -42,6 +45,7 @@ public:
         std::shared_ptr<IRPeaksDetectionService> r_peaks_detection_service,
         std::shared_ptr<IHRVTimeProcessingService> hrv_time_processing_service,
         std::shared_ptr<IHRVGeoProcessingService> hrv_geo_processing_service,
+        std::shared_ptr<IHRVDFAProcessingService> hrv_dfa_processing_service,
         std::shared_ptr<IWavesDetectionService> waves_detection_service,
         std::shared_ptr<IHeartClassDetectionService> heart_class_detection_service
     );
@@ -71,6 +75,8 @@ public:
     HRVTimeMetrics CalculateHRVTime(HRVTimeMetrics::SpectralMethod method) const override;
 
     HRVGeoMetrics CalculateHRVGeo() const override;
+
+    HRVDFAMetrics CalculateHRVDFA() const override;
 
     bool CalculateWaves() const override;
 

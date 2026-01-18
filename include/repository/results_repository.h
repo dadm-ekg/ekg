@@ -34,6 +34,13 @@ public:
         const HRVGeoMetrics &hrv_geo_metrics
     ) override;
 
+    bool ExportHRVDFA(
+        FileFormat format,
+        const QString &filepath,
+        const QString &filename,
+        const HRVDFAMetrics &hrv_dfa_metrics
+    ) override;
+
     bool ExportWaves(
         FileFormat format,
         const QString &filepath,
@@ -66,6 +73,10 @@ private:
     bool ExportHRVGeoJSON(const QString &filepath, const QString &filename, const HRVGeoMetrics &hrv_geo_metrics);
     bool ExportHRVGeoCSV(const QString &filepath, const QString &filename, const HRVGeoMetrics &hrv_geo_metrics);
     bool ExportHRVGeoHTML(const QString &filepath, const QString &filename, const HRVGeoMetrics &hrv_geo_metrics);
+
+    bool ExportHRVDFAJSON(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics);
+    bool ExportHRVDFACSV(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics);
+    bool ExportHRVDFAHTML(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics);
 
     bool ExportWavesJSON(const QString &filepath, const QString &filename, std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint>> waves, std::shared_ptr<SignalDataset> filtered_data);
     bool ExportWavesCSV(const QString &filepath, const QString &filename, std::shared_ptr<std::vector<WaveAnnotatedSignalDatapoint>> waves, std::shared_ptr<SignalDataset> filtered_data);

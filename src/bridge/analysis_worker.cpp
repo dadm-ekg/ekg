@@ -156,6 +156,11 @@ void AnalysisWorker::runHRVGeo() {
     emit hrvGeoCompleted(true, metrics, "");
 }
 
+void AnalysisWorker::runHRVDFA() {
+    HRVDFAMetrics metrics = application_service_->CalculateHRVDFA();
+    emit hrvDfaCompleted(true, metrics, "");
+}
+
 void AnalysisWorker::runWaves() {
     bool success = application_service_->CalculateWaves();
     QString errorMessage = success ? "" : "Nie udało się wykryć fal EKG";

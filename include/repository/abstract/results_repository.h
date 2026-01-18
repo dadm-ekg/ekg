@@ -5,6 +5,7 @@
 #include "../../dto/file_format.h"
 #include "../../dto/hrv_time_metrics.h"
 #include "../../dto/hrv_geo_metrics.h"
+#include "../../dto/hrv_dfa_metrics.h"
 #include "../../dto/heart_class_result.h"
 #include "../../model/signal_dataset.h"
 #include "../../model/r_peaks_annotated_signal_datapoint.h"
@@ -41,6 +42,13 @@ public:
         const QString &filepath,
         const QString &filename,
         const HRVGeoMetrics &hrv_geo_metrics
+    ) = 0;
+
+    virtual bool ExportHRVDFA(
+        FileFormat format,
+        const QString &filepath,
+        const QString &filename,
+        const HRVDFAMetrics &hrv_dfa_metrics
     ) = 0;
 
     virtual bool ExportWaves(

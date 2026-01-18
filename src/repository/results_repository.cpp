@@ -86,6 +86,24 @@ bool ResultsRepository::ExportHRVGeo(
     }
 }
 
+bool ResultsRepository::ExportHRVDFA(
+    FileFormat format,
+    const QString &filepath,
+    const QString &filename,
+    const HRVDFAMetrics &hrv_dfa_metrics
+) {
+    switch (format) {
+        case FileFormat::CSV:
+            return ExportHRVDFACSV(filepath, filename, hrv_dfa_metrics);
+        case FileFormat::HTML:
+            return ExportHRVDFAHTML(filepath, filename, hrv_dfa_metrics);
+        case FileFormat::JSON:
+            return ExportHRVDFAJSON(filepath, filename, hrv_dfa_metrics);
+        default:
+            return false;
+    }
+}
+
 bool ResultsRepository::ExportWaves(
     FileFormat format,
     const QString &filepath,
@@ -956,6 +974,65 @@ bool ResultsRepository::ExportHRVGeoHTML(const QString &filepath, const QString 
     out << "</script>\n";
     out << "</body>\n";
     out << "</html>\n";
+    file.close();
+    return true;
+}
+
+bool ResultsRepository::ExportHRVDFAJSON(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream out(&file);
+    QJsonObject root;
+    root["module"] = "HRV DFA";
+    root["filename"] = filename;
+    QJsonObject data;
+    data["alpha1"] = hrv_dfa_metrics.alpha1;
+    data["alpha2"] = hrv_dfa_metrics.alpha2;
+    root["data"] = data;
+    QJsonDocument doc(root);
+    out << doc.toJson();
+    file.close();
+    return true;
+}
+
+bool ResultsRepository::ExportHRVDFACSV(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream out(&file);
+    out.setRealNumberPrecision(6);
+    out << "Module,HRV DFA\n";
+    out << "Filename," << filename << "\n\n";
+    out << "Parameter,Value\n";
+    out << "Alpha1," << hrv_dfa_metrics.alpha1 << "\n";
+    out << "Alpha2," << hrv_dfa_metrics.alpha2 << "\n";
+    file.close();
+    return true;
+}
+
+bool ResultsRepository::ExportHRVDFAHTML(const QString &filepath, const QString &filename, const HRVDFAMetrics &hrv_dfa_metrics) {
+    QFile file(filepath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream out(&file);
+    out.setRealNumberPrecision(6);
+    out << "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n";
+    out << "<title>EKG Results - HRV DFA</title>\n<style>\n";
+    out << "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n";
+    out << "h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }\n";
+    out << "table { border-collapse: collapse; width: 100%; margin: 20px 0; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }\n";
+    out << "th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }\n";
+    out << "th { background-color: #4CAF50; color: white; }\n";
+    out << ".info { background-color: #e7f3ff; padding: 15px; border-left: 4px solid #2196F3; margin: 20px 0; }\n</style>\n</head>\n<body>\n";
+    out << "<h1>EKG Analysis Results</h1>\n<div class=\"info\">\n";
+    out << "<p><strong>Module:</strong> HRV DFA</p>\n<p><strong>Filename:</strong> " << filename << "</p>\n</div>\n";
+    out << "<h2>HRV DFA Metrics</h2>\n<table>\n<tr><th>Parameter</th><th>Value</th></tr>\n";
+    out << "<tr><td>Alpha1</td><td>" << hrv_dfa_metrics.alpha1 << "</td></tr>\n";
+    out << "<tr><td>Alpha2</td><td>" << hrv_dfa_metrics.alpha2 << "</td></tr>\n</table>\n</body>\n</html>\n";
     file.close();
     return true;
 }
