@@ -56,6 +56,8 @@ ApplicationWindow {
     property real chartMaxWindowSize: 60.0
     property var loadedSettings: null
 
+    readonly property var moduleNames: ["ECG BASELINE", "R PEAKS", "WAVES", "HRV TIME", "HRV GEO", "HEART CLASS"]
+
     function clampChannelIndex(idx) {
         if (channelOptions.length === 0)
             return 0
@@ -341,6 +343,8 @@ ApplicationWindow {
     }
 
     property string currentModule: "ECG BASELINE"
+    readonly property bool isEcgChartView: currentModule !== "HRV TIME" && currentModule !== "HRV GEO" && currentModule !== "HEART CLASS"
+
     onCurrentModuleChanged: {
         window.isProcessing = false
         analysisProgress.value = 0
@@ -587,41 +591,8 @@ ApplicationWindow {
 
         function onSettingsLoadSuccess(settings) {
             window.loadedSettings = settings
-            
-            if ("isDarkTheme" in settings) {
-                window.isDarkTheme = settings["isDarkTheme"]
-            }
-            if ("chartWindowSize" in settings) {
-                window.chartWindowSize = settings["chartWindowSize"]
-            }
-            if ("maxPlottedPoints" in settings) {
-                window.maxPlottedPoints = settings["maxPlottedPoints"]
-            }
-            if ("selectedChannel" in settings) {
-                window.selectedChannelIndex = settings["selectedChannel"]
-            }
-            if ("selectedFilterMethod" in settings) {
-                window.selectedFilterMethod = settings["selectedFilterMethod"]
-            }
-            if ("selectedRPeaksMethod" in settings) {
-                window.selectedRPeaksMethod = settings["selectedRPeaksMethod"]
-            }
-            if ("selectedHRVTimeMethod" in settings) {
-                window.selectedHRVTimeMethod = settings["selectedHRVTimeMethod"]
-            }
-            
-            if ("currentModule" in settings) {
-                var modules = ["ECG BASELINE", "R PEAKS", "WAVES", "HRV TIME", "HRV GEO", "HEART CLASS"]
-                var idx = modules.indexOf(settings["currentModule"])
-                if (idx >= 0) {
-                    moduleCombo.currentIndex = idx
-                }
-            }
-            
-            Qt.callLater(function() {
-                applyLoadedSettings()
-            })
-            
+            applyWindowSettingsFrom(settings)
+            Qt.callLater(applyLoadedSettings)
             showTemporaryStatus("✓ Ustawienia wczytane", Material.Green)
             refreshVisualization()
         }
@@ -655,6 +626,121 @@ ApplicationWindow {
         exportFileDialog.nameFilters = [ext.toUpperCase() + " files (*." + ext + ")", "All files (*)"]
         exportFileDialog.selectedFormat = ext
         exportFileDialog.open()
+    }
+
+    function formatDuration(sec) {
+        if (!sec || isNaN(sec)) return "00:00"
+        var m = Math.floor(sec / 60), s = Math.floor(sec % 60)
+        return m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0')
+    }
+
+    function applyWindowSettingsFrom(settings) {
+        if (!settings) return
+        if ("isDarkTheme" in settings) window.isDarkTheme = settings.isDarkTheme
+        if ("chartWindowSize" in settings) window.chartWindowSize = settings.chartWindowSize
+        if ("maxPlottedPoints" in settings) window.maxPlottedPoints = settings.maxPlottedPoints
+        if ("selectedChannel" in settings) window.selectedChannelIndex = settings.selectedChannel
+        if ("selectedFilterMethod" in settings) window.selectedFilterMethod = settings.selectedFilterMethod
+        if ("selectedRPeaksMethod" in settings) window.selectedRPeaksMethod = settings.selectedRPeaksMethod
+        if ("selectedHRVTimeMethod" in settings) window.selectedHRVTimeMethod = settings.selectedHRVTimeMethod
+        if ("currentModule" in settings) {
+            var idx = moduleNames.indexOf(settings.currentModule)
+            if (idx >= 0) moduleCombo.currentIndex = idx
+        }
+    }
+
+    function isModuleExportReady() {
+        switch (currentModule) {
+            case "ECG BASELINE": return ekgController.baselineCompleted
+            case "R PEAKS": return ekgController.rPeaksCompleted
+            case "HRV TIME": return ekgController.hrvTimeCompleted
+            case "HRV GEO": return ekgController.hrvGeoCompleted
+            case "WAVES": return ekgController.wavesCompleted
+            case "HEART CLASS": return ekgController.heartClassCompleted
+            default: return false
+        }
+    }
+
+    function isRunButtonEnabled() {
+        var p = paramsLoader.item
+        switch (currentModule) {
+            case "ECG BASELINE": return p && p.isReady && p.isReady()
+            case "R PEAKS": return p && p.isReady && p.isReady()
+            case "HRV TIME": return p && p.isReady && p.isReady()
+            case "HRV GEO": return ekgController.rPeaksCompleted
+            case "WAVES": return ekgController.hasFilteredData
+            case "HEART CLASS": return ekgController.hasFilteredData && ekgController.rPeaksCompleted
+            default: return true
+        }
+    }
+
+    function runCurrentModuleAnalysis() {
+        var item = paramsLoader.item
+        if (!item) return
+        switch (currentModule) {
+            case "ECG BASELINE": if (item.runFiltering) item.runFiltering(); break
+            case "R PEAKS": if (item.runDetection) item.runDetection(); break
+            case "HRV TIME": if (item.runHRVTime) item.runHRVTime(); break
+            case "HRV GEO": if (item.runHRVGeo) item.runHRVGeo(); break
+            case "WAVES": if (item.runWaves) item.runWaves(); break
+            case "HEART CLASS": if (item.runHeartClass) item.runHeartClass(); break
+        }
+    }
+
+    function performModuleReset() {
+        switch (currentModule) {
+            case "ECG BASELINE":
+                ekgController.resetBaseline()
+                lastUsedFilter = ""; lastUsedRPeaksMethod = ""; lastUsedHRVTimeMethod = ""
+                hrvGeoRan = false; wavesRan = false
+                selectedFilterMethod = -1; selectedRPeaksMethod = -1; selectedHRVTimeMethod = -1
+                chartFilteredSeries = []; chartRPeaksSeries = []; chartWaveMarkers = {}
+                filteredSeriesLine.clear(); peaksSeries.clear(); pOnsetSeries.clear(); pEndSeries.clear(); qrsOnsetSeries.clear(); tEndSeries.clear()
+                filteredSeriesLine.visible = false; peaksSeries.visible = false; pOnsetSeries.visible = false
+                pEndSeries.visible = false; qrsOnsetSeries.visible = false; qrsEndSeries.visible = false; tEndSeries.visible = false
+                break
+            case "R PEAKS":
+                ekgController.resetRPeaks()
+                lastUsedRPeaksMethod = ""; lastUsedHRVTimeMethod = ""; hrvGeoRan = false; wavesRan = false
+                selectedRPeaksMethod = -1; selectedHRVTimeMethod = -1
+                chartRPeaksSeries = []; peaksSeries.clear(); peaksSeries.visible = false
+                break
+            case "HRV TIME":
+                ekgController.resetHRVTime()
+                lastUsedHRVTimeMethod = ""; selectedHRVTimeMethod = -1
+                break
+            case "HRV GEO":
+                ekgController.resetHRVGeo()
+                hrvGeoRan = false
+                break
+            case "WAVES":
+                ekgController.resetWaves()
+                wavesRan = false
+                chartWaveMarkers = {}
+                pOnsetSeries.clear(); pEndSeries.clear(); qrsOnsetSeries.clear(); tEndSeries.clear()
+                pOnsetSeries.visible = false; pEndSeries.visible = false; qrsOnsetSeries.visible = false; tEndSeries.visible = false
+                break
+            case "HEART CLASS":
+                ekgController.resetHeartClass()
+                heartClassRan = false; heartClassAnnotations = []
+                break
+            default:
+                chartRawSeries = []; chartFilteredSeries = []; chartRPeaksSeries = []; chartWaveMarkers = {}
+                rawSeriesLine.clear(); filteredSeriesLine.clear(); peaksSeries.clear()
+                pOnsetSeries.clear(); pEndSeries.clear(); qrsOnsetSeries.clear(); qrsEndSeries.clear(); tEndSeries.clear()
+                rawSeriesLine.visible = false; filteredSeriesLine.visible = false; peaksSeries.visible = false
+                pOnsetSeries.visible = false; pEndSeries.visible = false; qrsOnsetSeries.visible = false; qrsEndSeries.visible = false; tEndSeries.visible = false
+        }
+    }
+
+    function paramsComponentForModule(m) {
+        if (m === "ECG BASELINE") return baselineParams
+        if (m === "R PEAKS") return rPeaksParams
+        if (m === "WAVES") return wavesParams
+        if (m === "HRV TIME") return hrvTimeParams
+        if (m === "HRV GEO") return hrvGeoParams
+        if (m === "HEART CLASS") return heartClassParams
+        return null
     }
 
     property string tempStatusText: ""
@@ -768,22 +854,7 @@ ApplicationWindow {
                 text: "Zapisz wyniki"
                 icon.name: "document-save"
                 Material.foreground: window.buttonTextColor
-                enabled: {
-                    if (window.currentModule === "ECG BASELINE") {
-                        return ekgController.baselineCompleted
-                    } else if (window.currentModule === "R PEAKS") {
-                        return ekgController.rPeaksCompleted
-                    } else if (window.currentModule === "HRV TIME") {
-                        return ekgController.hrvTimeCompleted
-                    } else if (window.currentModule === "HRV GEO") {
-                        return ekgController.hrvGeoCompleted
-                    } else if (window.currentModule === "WAVES") {
-                        return ekgController.wavesCompleted
-                    } else if (window.currentModule === "HEART CLASS") {
-                        return ekgController.heartClassCompleted
-                    }
-                    return false
-                }
+                enabled: isModuleExportReady()
 
                 Menu {
                     id: saveResultsMenu
@@ -1008,14 +1079,7 @@ ApplicationWindow {
                     id: moduleCombo
                     Layout.fillWidth: true
                     enabled: !window.isProcessing && !chartLoading
-                    model: [
-                        "ECG BASELINE",
-                        "R PEAKS",
-                        "WAVES",
-                        "HRV TIME",
-                        "HRV GEO",
-                        "HEART CLASS"
-                    ]
+                    model: moduleNames
                     onCurrentTextChanged: window.currentModule = currentText
 
                     Material.foreground: window.isDarkTheme ? "#f9fafb" : "#111827"
@@ -1067,8 +1131,8 @@ ApplicationWindow {
                                 id: channelCombo
                                 model: channelOptions
                                 Layout.preferredWidth: 150
-                                enabled: model.length > 0 && !chartLoading && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
-                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                enabled: model.length > 0 && !chartLoading && isEcgChartView
+                                visible: isEcgChartView
                                 currentIndex: selectedChannelIndex
                                 onActivated: {
                                     selectedChannelIndex = currentIndex
@@ -1083,15 +1147,15 @@ ApplicationWindow {
 
                             Button {
                                 text: "Oddal"
-                                enabled: ekgController.hasData && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
-                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                enabled: ekgController.hasData && isEcgChartView
+                                visible: isEcgChartView
                                 onClicked: zoomChart(1.5)
                             }
 
                             Button {
                                 text: "Przybliż"
-                                enabled: ekgController.hasData && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
-                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                enabled: ekgController.hasData && isEcgChartView
+                                visible: isEcgChartView
                                 onClicked: zoomChart(0.67)
                             }
                         }
@@ -1100,17 +1164,10 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 40
                             spacing: 10
-                            visible: ekgController.hasData && chartTotalDuration > chartWindowSize && window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                            visible: ekgController.hasData && chartTotalDuration > chartWindowSize && isEcgChartView
                             
                             Label {
-                                text: {
-                                    var effectiveWindowSize = Math.min(chartWindowSize, chartTotalDuration)
-                                    var scrollableRange = Math.max(0, chartTotalDuration - effectiveWindowSize)
-                                    var startTime = chartScrollPosition * scrollableRange
-                                    var minutes = Math.floor(startTime / 60)
-                                    var seconds = Math.floor(startTime % 60)
-                                    return minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
-                                }
+                                text: formatDuration(chartScrollPosition * Math.max(0, chartTotalDuration - Math.min(chartWindowSize, chartTotalDuration)))
                                 font.family: "monospace"
                                 color: textSecondary
                             }
@@ -1136,11 +1193,7 @@ ApplicationWindow {
                             }
                             
                             Label {
-                                text: {
-                                    var minutes = Math.floor(chartTotalDuration / 60)
-                                    var seconds = Math.floor(chartTotalDuration % 60)
-                                    return minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
-                                }
+                                text: formatDuration(chartTotalDuration)
                                 font.family: "monospace"
                                 color: textSecondary
                             }
@@ -1160,7 +1213,7 @@ ApplicationWindow {
                                 legend.alignment: Qt.AlignTop
                                 legend.labelColor: textSecondary
                                 enabled: ekgController.hasData
-                                visible: window.currentModule !== "HRV TIME" && window.currentModule !== "HRV GEO" && window.currentModule !== "HEART CLASS"
+                                visible: isEcgChartView
 
                                 ValueAxis {
                                     id: chartAxisX
@@ -1918,14 +1971,7 @@ ApplicationWindow {
                 Loader {
                     id: paramsLoader
                     Layout.fillWidth: true
-                    sourceComponent:
-                            window.currentModule === "ECG BASELINE" ? baselineParams :
-                            window.currentModule === "R PEAKS" ? rPeaksParams :
-                                window.currentModule === "WAVES" ? wavesParams :
-                                    window.currentModule === "HRV TIME" ? hrvTimeParams :
-                                        window.currentModule === "HRV GEO" ? hrvGeoParams :
-                                            window.currentModule === "HEART CLASS" ? heartClassParams :
-                                            null
+                    sourceComponent: paramsComponentForModule(window.currentModule)
                     onLoaded: {
                         if (window.loadedSettings) {
                             Qt.callLater(applyLoadedSettings)
@@ -1948,23 +1994,7 @@ ApplicationWindow {
                         id: runButton
                         text: "Uruchom analizę"
                         Layout.fillWidth: true
-                        enabled: {
-                            var params = paramsLoader.item
-                            if (window.currentModule === "ECG BASELINE") {
-                                return params && params.isReady && params.isReady()
-                            } else if (window.currentModule === "R PEAKS") {
-                                return params && params.isReady && params.isReady()
-                            } else if (window.currentModule === "HRV TIME") {
-                                return params && params.isReady && params.isReady()
-                            } else if (window.currentModule === "HRV GEO") {
-                                return ekgController.rPeaksCompleted
-                            } else if (window.currentModule === "WAVES") {
-                                return ekgController.hasFilteredData
-                            } else if (window.currentModule === "HEART CLASS") {
-                                return ekgController.hasFilteredData && ekgController.rPeaksCompleted
-                            }
-                            return true
-                        }
+                        enabled: isRunButtonEnabled()
 
                         ToolTip.visible: hovered && !enabled
                         ToolTip.text: {
@@ -2003,33 +2033,7 @@ ApplicationWindow {
                             id: analysisDelayTimer
                             interval: 50
                             repeat: false
-                            onTriggered: {
-                                if (window.currentModule === "ECG BASELINE") {
-                                    if (paramsLoader.item && paramsLoader.item.runFiltering) {
-                                        paramsLoader.item.runFiltering()
-                                    }
-                                } else if (window.currentModule === "R PEAKS") {
-                                    if (paramsLoader.item && paramsLoader.item.runDetection) {
-                                        paramsLoader.item.runDetection()
-                                    }
-                                } else if (window.currentModule === "HRV TIME") {
-                                    if (paramsLoader.item && paramsLoader.item.runHRVTime) {
-                                        paramsLoader.item.runHRVTime()
-                                    }
-                                } else if (window.currentModule === "HRV GEO") {
-                                    if (paramsLoader.item && paramsLoader.item.runHRVGeo) {
-                                        paramsLoader.item.runHRVGeo()
-                                    }
-                                } else if (window.currentModule === "WAVES") {
-                                    if (paramsLoader.item && paramsLoader.item.runWaves) {
-                                        paramsLoader.item.runWaves()
-                                    }
-                                } else if (window.currentModule === "HEART CLASS") {
-                                    if (paramsLoader.item && paramsLoader.item.runHeartClass) {
-                                        paramsLoader.item.runHeartClass()
-                                    }
-                                }
-                            }
+                            onTriggered: runCurrentModuleAnalysis()
                         }
                     }
 
@@ -2041,91 +2045,7 @@ ApplicationWindow {
                             window.isProcessing = false
                             statusResetTimer.stop()
                             analysisProgress.value = 0
-                            if (window.currentModule === "ECG BASELINE") {
-                                ekgController.resetBaseline()
-                                lastUsedFilter = ""
-                                lastUsedRPeaksMethod = ""
-                                lastUsedHRVTimeMethod = ""
-                                hrvGeoRan = false
-                                wavesRan = false
-                                selectedFilterMethod = -1
-                                selectedRPeaksMethod = -1
-                                selectedHRVTimeMethod = -1
-                                chartFilteredSeries = []
-                                chartRPeaksSeries = []
-                                chartWaveMarkers = {}
-                                filteredSeriesLine.clear()
-                                peaksSeries.clear()
-                                pOnsetSeries.clear()
-                                pEndSeries.clear()
-                                qrsOnsetSeries.clear()
-                                qrsEndSeries.clear()
-                                tEndSeries.clear()
-                                filteredSeriesLine.visible = false
-                                peaksSeries.visible = false
-                                pOnsetSeries.visible = false
-                                pEndSeries.visible = false
-                                qrsOnsetSeries.visible = false
-                                qrsEndSeries.visible = false
-                                tEndSeries.visible = false
-                            } else if (window.currentModule === "R PEAKS") {
-                                ekgController.resetRPeaks()
-                                lastUsedRPeaksMethod = ""
-                                lastUsedHRVTimeMethod = ""
-                                hrvGeoRan = false
-                                wavesRan = false
-                                selectedRPeaksMethod = -1
-                                selectedHRVTimeMethod = -1
-                                chartRPeaksSeries = []
-                                peaksSeries.clear()
-                                peaksSeries.visible = false
-                            } else if (window.currentModule === "HRV TIME") {
-                                ekgController.resetHRVTime()
-                                lastUsedHRVTimeMethod = ""
-                                selectedHRVTimeMethod = -1
-                            } else if (window.currentModule === "HRV GEO") {
-                                ekgController.resetHRVGeo()
-                                hrvGeoRan = false
-                            } else if (window.currentModule === "WAVES") {
-                                ekgController.resetWaves()
-                                wavesRan = false
-                                chartWaveMarkers = {}
-                                pOnsetSeries.clear()
-                                pEndSeries.clear()
-                                qrsOnsetSeries.clear()
-                                qrsEndSeries.clear()
-                                tEndSeries.clear()
-                                pOnsetSeries.visible = false
-                                pEndSeries.visible = false
-                                qrsOnsetSeries.visible = false
-                                qrsEndSeries.visible = false
-                                tEndSeries.visible = false
-                            } else if (window.currentModule === "HEART CLASS") {
-                                ekgController.resetHeartClass()
-                                heartClassRan = false
-                                heartClassAnnotations = []
-                            } else {
-                                chartRawSeries = []
-                                chartFilteredSeries = []
-                                chartRPeaksSeries = []
-                                chartWaveMarkers = {}
-                                rawSeriesLine.clear()
-                                filteredSeriesLine.clear()
-                                peaksSeries.clear()
-                                pOnsetSeries.clear()
-                                pEndSeries.clear()
-                                qrsOnsetSeries.clear()
-                                qrsEndSeries.clear()
-                                tEndSeries.clear()
-                                rawSeriesLine.visible = false
-                                filteredSeriesLine.visible = false
-                                peaksSeries.visible = false
-                                pOnsetSeries.visible = false
-                                pEndSeries.visible = false
-                                qrsOnsetSeries.visible = false
-                                qrsEndSeries.visible = false
-                                tEndSeries.visible = false
-                            }
+                            performModuleReset()
 
                             if (paramsLoader.item && paramsLoader.item.resetState) {
                                 paramsLoader.item.resetState()
