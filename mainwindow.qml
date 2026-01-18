@@ -127,7 +127,6 @@ ApplicationWindow {
 
         function updateSeries(series, data) {
             series.clear()
-            var loggedSample = false
             for (var i = 0; i < data.length; ++i) {
                 var p = data[i]
                 var xVal = undefined
@@ -144,15 +143,9 @@ ApplicationWindow {
                 if (xVal === undefined || yVal === undefined || isNaN(xVal) || isNaN(yVal))
                     continue
                 series.append(xVal, yVal)
-                if (!loggedSample && i === 0) {
-                    console.log("QML append first point", xVal, yVal)
-                    loggedSample = true
-                }
             }
             series.visible = data.length > 0
         }
-
-        console.log("QML chart update - raw:", chartRawSeries.length, "filtered:", chartFilteredSeries.length, "peaks:", chartRPeaksSeries.length, "channel:", selectedChannelIndex)
 
         updateSeries(rawSeriesLine, chartRawSeries)
         updateSeries(filteredSeriesLine, chartFilteredSeries)
@@ -280,7 +273,6 @@ ApplicationWindow {
             }
         } else if (window.currentModule === "HRV GEO" && ekgController.hrvGeoCompleted) {
             var histogram = ekgController.getHRVGeoHistogram()
-            console.log("HRV GEO histogram length:", histogram ? histogram.length : 0)
             if (histogram && histogram.length > 0) {
                 while (histogramBarSet.count > 0) {
                     histogramBarSet.remove(0)
@@ -300,7 +292,6 @@ ApplicationWindow {
                     }
                 }
                 hrvGeoHistogramAxisX.categories = categories
-                console.log("HRV GEO histogram bars:", histogramBarSet.count, "maxCount:", maxCount)
                 if (histogramBarSet.count > 0) {
                     hrvGeoHistogramAxisY.max = maxCount * 1.1
                     hrvGeoHistogramAxisY.min = 0
@@ -308,7 +299,6 @@ ApplicationWindow {
             }
 
             var poincare = ekgController.getHRVGeoPoincare()
-            console.log("HRV GEO poincare length:", poincare ? poincare.length : 0)
             if (poincare && poincare.length > 0) {
                 poincareSeries.clear()
                 var maxRRGeo = 0, minRRGeo = Infinity
@@ -326,7 +316,6 @@ ApplicationWindow {
                         }
                     }
                 }
-                console.log("HRV GEO poincare points:", poincareSeries.count, "min:", minRRGeo, "max:", maxRRGeo)
                 if (poincareSeries.count > 0) {
                     var margin = (maxRRGeo - minRRGeo) * 0.1
                     hrvGeoPoincareAxisX.min = Math.max(0, minRRGeo - margin)
@@ -449,7 +438,7 @@ ApplicationWindow {
         }
 
         function onFileLoadError(errorMessage) {
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onFilteringSuccess(filterName) {
@@ -463,7 +452,7 @@ ApplicationWindow {
             window.isProcessing = false
             chartLoading = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onRPeaksDetectionSuccess(methodName) {
@@ -493,7 +482,7 @@ ApplicationWindow {
             window.isProcessing = false
             chartLoading = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onHrvTimeSuccess(methodName) {
@@ -506,7 +495,7 @@ ApplicationWindow {
         function onHrvTimeError(errorMessage) {
             window.isProcessing = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onHrvTimeCompletedChanged() {
@@ -529,7 +518,7 @@ ApplicationWindow {
         function onHrvGeoError(errorMessage) {
             window.isProcessing = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onHrvGeoCompletedChanged() {
@@ -552,7 +541,7 @@ ApplicationWindow {
         function onWavesError(errorMessage) {
             window.isProcessing = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onWavesCompletedChanged() {
@@ -574,7 +563,7 @@ ApplicationWindow {
         function onHeartClassError(errorMessage) {
             window.isProcessing = false
             analysisProgress.value = 0
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onHeartClassCompletedChanged() {
@@ -593,12 +582,10 @@ ApplicationWindow {
         }
 
         function onSettingsSaveError(errorMessage) {
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
 
         function onSettingsLoadSuccess(settings) {
-            console.log("Settings loaded:", JSON.stringify(settings))
-            
             window.loadedSettings = settings
             
             if ("isDarkTheme" in settings) {
@@ -640,7 +627,7 @@ ApplicationWindow {
         }
 
         function onSettingsLoadError(errorMessage) {
-            showTemporaryStatus("✗ " + errorMessage, Material.Red)
+            showError(errorMessage)
         }
     }
 
@@ -650,6 +637,24 @@ ApplicationWindow {
         analysisStatus.text = message
         analysisStatus.color = Material.color(color)
         statusResetTimer.restart()
+    }
+
+    function showError(msg) {
+        showTemporaryStatus("✗ " + msg, Material.Red)
+    }
+
+    function openExportDialog(ext) {
+        var baseName = ekgController.loadedFilename
+        if (baseName === "") baseName = "wyniki"
+        else {
+            var lastDot = baseName.lastIndexOf(".")
+            if (lastDot > 0) baseName = baseName.substring(0, lastDot)
+        }
+        var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
+        exportFileDialog.currentFile = baseName + "_" + moduleName + "." + ext
+        exportFileDialog.nameFilters = [ext.toUpperCase() + " files (*." + ext + ")", "All files (*)"]
+        exportFileDialog.selectedFormat = ext
+        exportFileDialog.open()
     }
 
     property string tempStatusText: ""
@@ -787,54 +792,15 @@ ApplicationWindow {
 
                     MenuItem {
                         text: "Zapisz jako CSV"
-                        onTriggered: {
-                            var baseName = ekgController.loadedFilename
-                            if (baseName === "") baseName = "wyniki"
-                            else {
-                                var lastDot = baseName.lastIndexOf(".")
-                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
-                            }
-                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
-                            var defaultFileName = baseName + "_" + moduleName + ".csv"
-                            exportFileDialog.nameFilters = ["CSV files (*.csv)", "All files (*)"]
-                            exportFileDialog.currentFile = defaultFileName
-                            exportFileDialog.selectedFormat = "csv"
-                            exportFileDialog.open()
-                        }
+                        onTriggered: openExportDialog("csv")
                     }
                     MenuItem {
                         text: "Zapisz jako HTML"
-                        onTriggered: {
-                            var baseName = ekgController.loadedFilename
-                            if (baseName === "") baseName = "wyniki"
-                            else {
-                                var lastDot = baseName.lastIndexOf(".")
-                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
-                            }
-                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
-                            var defaultFileName = baseName + "_" + moduleName + ".html"
-                            exportFileDialog.nameFilters = ["HTML files (*.html)", "All files (*)"]
-                            exportFileDialog.currentFile = defaultFileName
-                            exportFileDialog.selectedFormat = "html"
-                            exportFileDialog.open()
-                        }
+                        onTriggered: openExportDialog("html")
                     }
                     MenuItem {
                         text: "Zapisz jako JSON"
-                        onTriggered: {
-                            var baseName = ekgController.loadedFilename
-                            if (baseName === "") baseName = "wyniki"
-                            else {
-                                var lastDot = baseName.lastIndexOf(".")
-                                if (lastDot > 0) baseName = baseName.substring(0, lastDot)
-                            }
-                            var moduleName = window.currentModule.replace(/\s+/g, "_").toLowerCase()
-                            var defaultFileName = baseName + "_" + moduleName + ".json"
-                            exportFileDialog.nameFilters = ["JSON files (*.json)", "All files (*)"]
-                            exportFileDialog.currentFile = defaultFileName
-                            exportFileDialog.selectedFormat = "json"
-                            exportFileDialog.open()
-                        }
+                        onTriggered: openExportDialog("json")
                     }
                 }
 
@@ -1937,10 +1903,6 @@ ApplicationWindow {
                         font.pixelSize: 12
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
-                        Component.onCompleted: {
-                            Qt.callLater(function () {
-                            })
-                        }
                     }
 
                     ProgressBar {

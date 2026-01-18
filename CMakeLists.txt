@@ -17,8 +17,6 @@ file(GLOB_RECURSE PROJECT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/*.h
         ${PROJECT_SOURCE_DIR}/include/*.h
         ${PROJECT_SOURCE_DIR}/main.cpp
-        ${PROJECT_SOURCE_DIR}/root.cpp
-        ${PROJECT_SOURCE_DIR}/root.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
