@@ -1,9 +1,13 @@
 #include <QApplication>
+#include <QMetaType>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <memory>
 
 #include "include/bridge/ekg_controller.h"
+#include "include/dto/filter_method.h"
+#include "include/dto/r_peaks_detection_method.h"
+#include "include/dto/hrv_spectral_method.h"
 #include "include/service/application_service.h"
 #include "include/repository/dat_signal_repository.h"
 #include "include/repository/results_repository.h"
@@ -20,6 +24,10 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+
+    qRegisterMetaType<FilterMethod>("FilterMethod");
+    qRegisterMetaType<RPeaksDetectionMethod>("RPeaksDetectionMethod");
+    qRegisterMetaType<HRVSpectralMethod>("HRVSpectralMethod");
 
     auto signal_repository = std::make_shared<DATSignalRepository>();
     auto butterworth_filter_service = std::make_shared<ButterworthFilterService>();
