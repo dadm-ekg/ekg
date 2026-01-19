@@ -369,12 +369,15 @@ ApplicationWindow {
                     } else if (filterMethod === 2 && paramsLoader.item.rbSavitzkyGolay) {
                         paramsLoader.item.rbSavitzkyGolay.checked = true
                     }
-                }
-                if ("windowSize" in settings) {
-                    paramsLoader.item.windowSize = settings["windowSize"]
-                }
-                if ("polynomialOrder" in settings) {
-                    paramsLoader.item.polynomialOrder = settings["polynomialOrder"]
+                    if (filterMethod === 1) {
+                        if ("windowSize" in settings) paramsLoader.item.cutoffFreq = settings["windowSize"]
+                    } else {
+                        if ("windowSize" in settings) paramsLoader.item.windowSize = settings["windowSize"]
+                        if ("polynomialOrder" in settings) paramsLoader.item.polynomialOrder = settings["polynomialOrder"]
+                    }
+                } else {
+                    if ("windowSize" in settings) paramsLoader.item.windowSize = settings["windowSize"]
+                    if ("polynomialOrder" in settings) paramsLoader.item.polynomialOrder = settings["polynomialOrder"]
                 }
             } else if (window.currentModule === "R PEAKS") {
                 if ("selectedRPeaksMethod" in settings) {
@@ -846,11 +849,12 @@ ApplicationWindow {
                             var windowSize = 5
                             var polynomialOrder = 2
                             if (window.currentModule === "ECG BASELINE" && paramsLoader.item) {
-                                if (paramsLoader.item.windowSize !== undefined) {
-                                    windowSize = paramsLoader.item.windowSize
-                                }
-                                if (paramsLoader.item.polynomialOrder !== undefined) {
-                                    polynomialOrder = paramsLoader.item.polynomialOrder
+                                if (window.selectedFilterMethod === 1) {
+                                    windowSize = paramsLoader.item.cutoffFreq !== undefined ? paramsLoader.item.cutoffFreq : 40
+                                    polynomialOrder = 0
+                                } else {
+                                    if (paramsLoader.item.windowSize !== undefined) windowSize = paramsLoader.item.windowSize
+                                    if (paramsLoader.item.polynomialOrder !== undefined) polynomialOrder = paramsLoader.item.polynomialOrder
                                 }
                             }
                             ekgController.openSaveSettingsDialog(
@@ -2121,6 +2125,7 @@ ApplicationWindow {
 
             property int windowSize: 5
             property int polynomialOrder: 2
+            property int cutoffFreq: 40
             property alias rbMovingAverage: rbMovingAverage
             property alias rbButterworth: rbButterworth
             property alias rbSavitzkyGolay: rbSavitzkyGolay
@@ -2154,7 +2159,8 @@ ApplicationWindow {
                     ekgController.runBaseline(0, windowSize, polynomialOrder)
                 } else if (rbButterworth.checked) {
                     window.selectedFilterMethod = 1
-                    ekgController.runBaseline(1, windowSize, polynomialOrder)
+                    var fs = Math.round(ekgController.samplingFrequency())
+                    ekgController.runBaseline(1, cutoffFreq, (fs >= 100 && fs <= 10000) ? fs : 500)
                 } else if (rbSavitzkyGolay.checked) {
                     window.selectedFilterMethod = 2
                     ekgController.runBaseline(2, windowSize, polynomialOrder)
@@ -2199,7 +2205,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 height: 1
                 color: borderColor
-                opacity: rbMovingAverage.checked || rbSavitzkyGolay.checked ? 1 : 0
+                opacity: filterGroup.checkedButton !== null ? 1 : 0
                 Layout.topMargin: 8
                 Layout.bottomMargin: 8
             }
@@ -2226,6 +2232,27 @@ ApplicationWindow {
                         if (val % 2 === 0) val++
                         baselineRoot.windowSize = val
                     }
+                    editable: true
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                visible: rbButterworth.checked
+                spacing: 8
+
+                Label {
+                    text: "Częstotliwość odcięcia (Hz):"
+                    color: textSecondary
+                    font.pixelSize: 13
+                }
+
+                SpinBox {
+                    id: cutoffFreqSpinBox
+                    from: 1
+                    to: 200
+                    value: baselineRoot.cutoffFreq
+                    onValueChanged: baselineRoot.cutoffFreq = value
                     editable: true
                 }
             }
