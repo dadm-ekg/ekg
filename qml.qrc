@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>mainwindow.qml</file>
+        <file>app.ico</file>
 
         <!-- BeatCNN5 weights -->
         <file>models/beatcnn5/beatcnn5_weights.bin</file>

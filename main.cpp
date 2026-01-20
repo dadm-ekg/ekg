@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QIcon>
 #include <QMetaType>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
