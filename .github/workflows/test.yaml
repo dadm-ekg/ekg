@@ -1,48 +1,13 @@
-name: Build Qt Executables
+name: Integration Tests
 on: push
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  test:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Qt
+      - id: Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.5.0'
           modules: 'qtcharts'
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Deploy macOS (macdeployqt)
-        if: matrix.os == 'macos-latest'
-        run: |
-          macdeployqt build/ekg.app -dmg
-          mv build/ekg.dmg ekg-macos.dmg
-
-      - name: Deploy Windows (windeployqt)
-        if: matrix.os == 'windows-latest'
-        run: |
-          windeployqt build/Release/ekg.exe --release
-          Compress-Archive -Path build/Release/* -DestinationPath ekg-windows.zip
-
-      - name: Upload macOS artifact
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ekg-macos
-          path: ekg-macos.dmg
-
-      - name: Upload Windows artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ekg-windows
-          path: ekg-windows.zip
+      - uses: actions/checkout@v4
+      - run: cmake .
+      - run: cmake --build .
