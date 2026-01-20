@@ -2948,7 +2948,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Przedsionkowe (A):"
+                    text: "Nadkomorowe (S):"
                 }
                 Label {
                     text: {
@@ -3007,7 +3007,7 @@ ApplicationWindow {
                         width: 12; height: 12; radius: 6; color: "#ef4444"
                     }
                     Label {
-                        text: "V - Komorowe (PVC)"; font.pixelSize: 12
+                        text: "V - Komorowe"; font.pixelSize: 12
                     }
                 }
 
@@ -3017,7 +3017,7 @@ ApplicationWindow {
                         width: 12; height: 12; radius: 6; color: "#f59e0b"
                     }
                     Label {
-                        text: "A - Przedsionkowe (PAC)"; font.pixelSize: 12
+                        text: "S - Nadkomorowe"; font.pixelSize: 12
                     }
                 }
             }
