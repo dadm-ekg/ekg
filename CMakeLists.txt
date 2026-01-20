@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
+option(EKG_STATIC_BUILD "Build fully statically linked executable on Windows (static CRT; requires static Qt)" OFF)
+
+if(EKG_STATIC_BUILD AND WIN32)
+  cmake_policy(SET CMP0091 NEW)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 project(ekg VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
@@ -58,6 +65,17 @@ target_link_libraries(ekg PRIVATE
     Qt${QT_VERSION_MAJOR}::Quick
     Qt${QT_VERSION_MAJOR}::Charts
 )
+
+if(EKG_STATIC_BUILD AND WIN32)
+  if(MSVC)
+    set_property(TARGET ekg PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  elseif(MINGW)
+    target_link_options(ekg PRIVATE -static -static-libgcc -static-libstdc++)
+  endif()
+  if(QT_VERSION_MAJOR EQUAL 6)
+    qt_import_plugins(ekg INCLUDE Qt${QT_VERSION_MAJOR}::QWindowsIntegrationPlugin)
+  endif()
+endif()
 
 if(${QT_VERSION} VERSION_LESS 6.1.0)
   set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.ekg)
