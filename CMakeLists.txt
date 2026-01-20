@@ -19,11 +19,22 @@ file(GLOB_RECURSE PROJECT_SOURCES
         ${PROJECT_SOURCE_DIR}/main.cpp
 )
 
+set(MACOSX_BUNDLE_ICON_FILE app.icns)
+
+set(app_icon_macos "${CMAKE_CURRENT_SOURCE_DIR}/app.icns")
+set_source_files_properties(${app_icon_macos} PROPERTIES
+       MACOSX_PACKAGE_LOCATION "Resources")
+
+set(app_icon_resource_windows "${CMAKE_CURRENT_SOURCE_DIR}/app.ico")
+
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(ekg
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        qml.qrc          # ← DODAJEMY TUTAJ
+        qml.qrc
+        ${ICON_FILE}
+        ${app_icon_macos}
+        ${app_icon_resource_windows}
     )
 else()
     if(ANDROID)
@@ -35,6 +46,9 @@ else()
         add_executable(ekg
             ${PROJECT_SOURCES}
             qml.qrc
+            ${ICON_FILE}
+            ${app_icon_macos}
+            ${app_icon_windows}
         )
     endif()
 endif()
